@@ -42,8 +42,10 @@ What this fork changes:
   error parsers and two paginators. They now sit on `src/printful_core/`, so a fix lands once.
 - **A CLI.** `printful` is a second surface over the same core — see [The CLI](#the-cli).
 - **More tools, and a test that counts them.** See [below](#the-32-mcp-tools).
-- **Documentation checked against the code.** Every command in this file was run before it was
-  written down.
+- **Documentation checked against the code.** Every command here was checked against the source
+  and its `--help` output, and most were run before being written down. The ones that call the
+  live Printful API, charge the account, or need an interactive host are **marked in place**
+  rather than run — look for *not run here* beside them.
 
 Install instructions below point at this fork, because that is where this code lives. Changes
 worth having are offered upstream.
@@ -70,6 +72,9 @@ This repository is both a plugin and the marketplace that serves it
 
 The plugin brings the MCP server (via `.mcp.json`) and two skills — one for the MCP tools, one
 for the CLI.
+
+*Not run here — these are Claude Code slash commands, not shell commands. The manifests they
+read were verified by reading them.*
 
 ### Option 2 — `.mcp.json`, no clone
 
@@ -113,9 +118,17 @@ python -m venv .venv
 .venv/bin/pip install -e ".[dev]"
 ```
 
-That installs two console scripts, `printful-mcp` and `printful`. Point your client at the
-interpreter that has them — a bare `python` resolves against `PATH` and is the single most
-common reason a working install does not start under an MCP client:
+That installs two console scripts into `.venv/bin/`: `printful-mcp` and `printful`.
+
+**Every runnable command in this README spells out `.venv/bin/`**, because that is what works
+immediately after the block above — the install does not put anything on your `PATH`. If you
+prefer, `source .venv/bin/activate` once and drop the prefix everywhere; the two forms are
+equivalent, and this document picks the explicit one so nothing depends on shell state. (Where a
+subcommand is named in passing, such as `printful test`, it is a name rather than something to
+paste.)
+
+Point your client at that interpreter too — a bare `python` resolves against `PATH` and is the
+single most common reason a working install does not start under an MCP client:
 
 ```json
 {
@@ -164,7 +177,7 @@ the `.codex-plugin/` manifest and why the compatibility layout was chosen, is in
 Without `PRINTFUL_API_KEY` the server refuses to start rather than failing later:
 
 ```console
-$ python -m printful_mcp
+$ .venv/bin/python -m printful_mcp
 Error: PRINTFUL_API_KEY environment variable is required
 Get your API key from: https://www.printful.com/dashboard/api
 $ echo $?
@@ -180,18 +193,18 @@ cp .env.example .env
 A token can live in two independent places, and **they do not see each other**:
 
 - **`.env` or the environment** — what the MCP server reads.
-- **`~/.config/printful/config.json`** — written by `printful config set api_key <token>`, read
-  by the CLI. `printful config path` prints its location.
+- **`~/.config/printful/config.json`** — written by `.venv/bin/printful config set api_key
+  <token>`, read by the CLI. `.venv/bin/printful config path` prints its location.
 
 Resolution order is explicit argument, then `PRINTFUL_API_KEY`, then that config file. So
-`printful config get` reports `No config set.` when your token is in `.env` — that is the config
-file being empty, not a missing key.
+`.venv/bin/printful config get` reports `No config set.` when your token is in `.env` — that is
+the config file being empty, not a missing key.
 
 To confirm either one without printing the value:
 
 ```bash
-grep -c '^PRINTFUL_API_KEY=.' .env   # 1 when .env carries it
-printful config get                  # reads the config file; masks all but the last 4 characters
+grep -c '^PRINTFUL_API_KEY=.' .env        # 1 when .env carries it
+.venv/bin/printful config get             # reads the config file; masks all but the last 4 chars
 ```
 
 **Never echo, paste or commit the token.** `.env` is git-ignored; keep it that way.
@@ -204,16 +217,16 @@ stdio is the default and is what Cursor, Claude Desktop and Claude Code use.
 
 | Transport | Use case | Command |
 |---|---|---|
-| `stdio` (default) | Cursor, Claude Desktop, Claude Code | `python -m printful_mcp` |
-| `http` | HTTP clients, mcporter | `python -m printful_mcp --transport http` |
-| `sse` | Legacy SSE clients | `python -m printful_mcp --transport sse` |
+| `stdio` (default) | Cursor, Claude Desktop, Claude Code | `.venv/bin/python -m printful_mcp` |
+| `http` | HTTP clients, mcporter | `.venv/bin/python -m printful_mcp --transport http` |
+| `sse` | Legacy SSE clients | `.venv/bin/python -m printful_mcp --transport sse` |
 
 ```bash
-python -m printful_mcp --transport http --port 8000            # streamable-http on /mcp
-python -m printful_mcp --transport http --host 0.0.0.0 --port 8080
+.venv/bin/python -m printful_mcp --transport http --port 8000   # streamable-http on /mcp
+.venv/bin/python -m printful_mcp --transport http --host 0.0.0.0 --port 8080
 ```
 
-Run `python -m printful_mcp --help` for the authoritative list of flags and defaults.
+Run `.venv/bin/python -m printful_mcp --help` for the authoritative list of flags and defaults.
 
 **With mcporter,** pass arguments as JSON — this is why the tools take flattened string
 parameters (`items_json`, `variant_ids`) rather than nested objects; typed and nested
@@ -222,6 +235,9 @@ parameters do not survive HTTP-to-stdio bridges:
 ```bash
 mcporter call printful_mcp.printful_list_catalog_products --args '{"limit":20}'
 ```
+
+*Not run here — mcporter is a separate tool and this call hits the live API. The reason behind
+it is verified: the flattened parameters are what `src/printful_mcp/models/inputs.py` declares.*
 
 ---
 
@@ -305,8 +321,16 @@ To print the registered names yourself:
 
 </details>
 
-Every tool returns a string and takes a `format` parameter — `"markdown"` for a rendered table,
-`"json"` for the raw payload. Errors come back as readable text, never a traceback.
+Every tool returns a string, and 30 of the 32 take a `format` parameter — `"markdown"` for a
+rendered table, `"json"` for the raw payload. Errors come back as readable text, never a
+traceback.
+
+The two exceptions are deliberate, and `CLAUDE.md` records both under "Known inconsistencies":
+
+- **`printful_list_countries` takes no parameters at all** — not even `format`.
+- **`printful_create_mockup_task`'s `format` is the *image* format**, `"jpg"` or `"png"`. Passing
+  `"markdown"` there is a validation error, not a harmless no-op. Do not "fix" this by renaming
+  it.
 
 ---
 
@@ -316,7 +340,7 @@ Every tool returns a string and takes a `format` parameter — `"markdown"` for 
 an interactive REPL.
 
 ```text
-$ printful --help
+$ .venv/bin/printful --help
 Commands:
   catalog  Browse the Printful product catalog (v2).
   config   Manage stored credentials and defaults.
@@ -332,16 +356,19 @@ Commands:
 ```
 
 ```bash
-printful catalog products --help     # every group takes --help
-printful ship countries
-printful catalog variants 71
-printful --json orders list          # machine-readable output
+.venv/bin/printful catalog products --help   # every group takes --help
+.venv/bin/printful ship countries
+.venv/bin/printful catalog variants 71
+.venv/bin/printful --json orders list        # machine-readable output
 ```
 
-`orders confirm` and `orders cancel` require an explicit `--yes`. `confirm` charges the account.
+*Only the `--help` line was run here. **Everything else in that block calls the live Printful
+API**, so the invocations were checked against each subcommand's `--help` instead — `ship
+countries` takes no arguments, `catalog variants` takes a positional `PRODUCT_ID`, and `--json`
+is a top-level flag.*
 
-`printful test` makes a live API call to verify credentials; everything above except `--help`
-does too.
+`orders confirm` and `orders cancel` require an explicit `--yes`, and **`confirm` charges the
+account** — neither was run here, nor was `printful test`, which exists to make a live call.
 
 ---
 
@@ -452,8 +479,8 @@ The key is not reaching the process. Check the source you actually used, without
 value:
 
 ```bash
-grep -c '^PRINTFUL_API_KEY=.' .env   # 1 when .env carries it
-printful config get                  # reads the CLI config file, which is not .env
+grep -c '^PRINTFUL_API_KEY=.' .env        # 1 when .env carries it
+.venv/bin/printful config get             # reads the CLI config file, which is not .env
 ```
 
 Under an MCP client neither file may be involved: the client does not inherit your shell, so
@@ -510,9 +537,12 @@ reachable. A task still pending after a couple of minutes has most likely failed
 
 ```bash
 .venv/bin/python -m pytest              # offline suite — no network, no credentials
-.venv/bin/python -m pytest -m live      # live API suite (spends real requests)
-.venv/bin/python -m pytest -m ""        # everything
+.venv/bin/python -m pytest -m live      # live API suite — not run here, spends real requests
+.venv/bin/python -m pytest -m ""        # everything — not run here, includes the live suite
 ```
+
+Only the first line is run in preparing this document. The offline suite is the one that
+matters for "is my install sound"; the other two cost real API requests.
 
 Two traps, both of which have cost real time:
 
@@ -549,6 +579,10 @@ For an interactive tool browser:
 export PRINTFUL_API_KEY=your-key
 ./test-with-inspector.sh          # npx @modelcontextprotocol/inspector, UI on :5173
 ```
+
+*Not run here — it launches an interactive browser UI.* Note that the script spawns a bare
+`python -m printful_mcp`, so it hits the same `PATH` trap as `cursor-mcp-config.json` above:
+either activate the venv first, or edit the script to use `.venv/bin/python`.
 
 [CLAUDE.md](CLAUDE.md) carries the full working notes for this repository.
 

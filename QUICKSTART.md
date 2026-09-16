@@ -26,7 +26,10 @@ python -m venv .venv
 ```
 
 This installs two console scripts into `.venv/bin/`: `printful-mcp` (the MCP server) and
-`printful` (the CLI).
+`printful` (the CLI). **The install puts nothing on your `PATH`**, so every command below spells
+out `.venv/bin/`. If you would rather type less, `source .venv/bin/activate` once and drop the
+prefix — but then the prefix is the thing that always works, and activation is the thing you
+have to remember.
 
 ## 3. Verify, before wiring anything up
 
@@ -55,7 +58,7 @@ To confirm the line is set without printing the value:
 grep -c '^PRINTFUL_API_KEY=.' .env
 ```
 
-`1` means it is set. Note that `printful config get` checks a **different** source —
+`1` means it is set. Note that `.venv/bin/printful config get` checks a **different** source —
 `~/.config/printful/config.json`, which `printful config set` writes — so it reports
 `No config set.` even when your `.env` is perfectly correct.
 
@@ -95,8 +98,8 @@ In the client:
 Or in the terminal, against the same core:
 
 ```bash
-printful ship countries
-printful catalog products --help
+.venv/bin/printful ship countries        # calls the live API
+.venv/bin/printful catalog products --help
 ```
 
 ## What runs on which API version

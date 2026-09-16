@@ -55,6 +55,45 @@ def test_a_catalog_product_page_carries_every_fact_a_buyer_needs():
     assert "**Status:** Available" in available
 
 
+def test_a_product_with_many_placements_says_how_many_it_is_not_showing():
+    """`product` lists only the first five placements. Without the overflow
+    line a caller reads five placements as all five that exist, and orders
+    against a product whose remaining options they never saw.
+    """
+    body = {
+        "id": 71,
+        "name": "Tee",
+        "placements": [{"placement": f"p{i}", "technique": "dtg"} for i in range(7)],
+    }
+    out = markdown.product(body)
+    assert "_(and 2 more)_" in out
+    assert "## Placements (7 available)" in out
+    assert "p4 - dtg" in out
+    assert "p5" not in out
+
+
+def test_a_country_with_many_states_says_how_many_it_is_not_showing():
+    """`countries` lists only the first three states per country. A caller
+    shipping to the fourth needs to know it exists; three states with no
+    overflow line reads as a country with three states.
+    """
+    out = markdown.countries(
+        {
+            "data": [
+                {
+                    "name": "United States",
+                    "code": "US",
+                    "states": [{"name": f"State{i}", "code": f"S{i}"} for i in range(5)],
+                }
+            ]
+        }
+    )
+    assert "_(and 2 more)_" in out
+    assert "**States:** 5 available" in out
+    assert "State2 (S2)" in out
+    assert "State3" not in out
+
+
 def test_a_product_list_page_reports_the_total_not_just_what_it_shows():
     """A page of 1 out of 239 must not read as 1 product existing, and a
     page of 1 must not read as 239 products showing either -- the shown

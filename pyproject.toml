@@ -67,7 +67,10 @@ testpaths = ["src/printful_core/tests", "src/printful_cli/tests", "src/printful_
 # a clean result. They are NOT softened: when selected without credentials they
 # fail loudly rather than skip.
 #   pytest              -> offline unit suite
-#   pytest -m live      -> live API suite (requires PRINTFUL_API_KEY)
+#   pytest -m live      -> live API suite (requires PRINTFUL_API_KEY and,
+#                          for an account-level token, PRINTFUL_STORE_ID --
+#                          without the store ID, store-scoped endpoints fail
+#                          with "This endpoint requires 'store_id'!")
 #   pytest -m ""        -> everything
 addopts = "-m 'not live'"
 markers = [

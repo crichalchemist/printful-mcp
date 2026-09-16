@@ -1,5 +1,5 @@
 ---
-name: "printful"
+name: "printful-cli"
 description: "Command-line interface for the Printful print-on-demand API — browse the catalog, build and place orders, calculate shipping and tax, and generate mockups. Includes guards on billable operations."
 ---
 

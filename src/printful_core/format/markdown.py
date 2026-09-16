@@ -600,7 +600,7 @@ def store_templates(data: Any) -> str:
     for row in rows:
         lines.extend([
             f"## {row.get('title', 'Template')} — ID {row.get('id')}",
-            f"- **Product ID:** {row.get('catalog_product_id', 'N/A')}",
+            f"- **Product ID:** {row.get('product_id', 'N/A')}",
             f"- **Created:** {row.get('created_at', 'N/A')}",
             f"",
         ])

@@ -11,6 +11,8 @@ import os
 
 import pytest
 
+from printful_core.auth import Credentials
+from printful_core.transport import AsyncTransport
 from printful_mcp.models.inputs import (
     CreateEstimationTaskInput,
     GetProductInput,
@@ -19,7 +21,6 @@ from printful_mcp.models.inputs import (
     ListStoreTemplatesInput,
 )
 from printful_mcp.tools import catalog, orders, shipping, stores
-from printful_mcp.transport import get_transport
 
 pytestmark = pytest.mark.live
 
@@ -31,16 +32,26 @@ def _require_credentials():
 
 
 @pytest.fixture
-def live_transport():
-    """The real transport.
+async def live_transport():
+    """A transport owned by this test, on this test's event loop.
 
     Deliberately NOT named `transport`. conftest.py defines a `transport`
-    fixture that yields a FakeTransport, and a module-local fixture of the same
-    name silently shadows it -- so a test moved out of this file would keep
-    hitting the live API under a name that reads as a fake.
+    fixture that yields a FakeTransport, and a module-local fixture of the
+    same name silently shadows it -- so a test moved out of this file would
+    keep hitting the live API under a name that reads as a fake.
+
+    Built per test rather than returning the module global: an httpx client
+    binds to the event loop that first uses it, pytest-asyncio gives each
+    test its own loop, and the singleton then fails at connection teardown
+    with "Event loop is closed" *after* a successful response -- a failure
+    that reads like an API problem and is not one.
     """
     _require_credentials()
-    return get_transport()
+    transport = AsyncTransport(Credentials.resolve())
+    try:
+        yield transport
+    finally:
+        await transport.close()
 
 
 async def test_the_country_list_contains_the_united_states(live_transport):
@@ -87,7 +98,19 @@ async def test_an_estimate_can_be_started_and_read(live_transport):
     accepted and that reading it returns one of the three known states -- not
     that it completes, because completion timing is the API's business.
     """
-    items = [{"source": "catalog", "catalog_variant_id": 4012, "quantity": 1}]
+    items = [{
+        "source": "catalog",
+        "catalog_variant_id": 4012,
+        "quantity": 1,
+        "placements": [{
+            "placement": "front",
+            "technique": "dtg",
+            "layers": [{
+                "type": "file",
+                "url": "https://raw.githubusercontent.com/github/explore/main/topics/python/python.png",
+            }],
+        }],
+    }]
     started = await orders.create_estimation_task(live_transport, CreateEstimationTaskInput(
         recipient_country_code="US", recipient_state_code="CA",
         recipient_city="San Francisco", recipient_zip="94107",

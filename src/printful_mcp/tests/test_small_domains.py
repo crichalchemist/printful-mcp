@@ -31,12 +31,13 @@ async def test_product_templates_render_the_v1_items_key(transport):
     that must appear rather than on the count line alone.
     """
     transport._responses.append({
-        "items": [{"id": 77, "title": "Summer Tee"}],
+        "items": [{"id": 77, "title": "Summer Tee", "product_id": 71}],
         "paging": {"total": 1},
     })
     out = await stores.list_store_templates(transport, ListStoreTemplatesInput())
     assert "Summer Tee" in out
     assert "Showing 1 templates" in out
+    assert "71" in out
 
 
 async def test_a_bare_list_of_templates_still_renders(transport):

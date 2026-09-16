@@ -26,6 +26,12 @@ class FakeTransport:
         if not self._responses:
             return {"data": {}}
         reply = self._responses.pop(0)
+        if isinstance(reply, type) and issubclass(reply, BaseException):
+            raise TypeError(
+                f"FakeTransport was queued the exception class {reply.__name__}, "
+                f"not an instance. Queue {reply.__name__}(...) so it can be "
+                "raised, not returned as a response body."
+            )
         if isinstance(reply, Exception):
             raise reply
         return reply

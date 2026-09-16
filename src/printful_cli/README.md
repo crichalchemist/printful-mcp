@@ -235,8 +235,10 @@ directory, so it collects this package's tests only; it does not stand in for th
 repository's suite, which is `.venv/bin/python -m pytest` with no path. See the repository
 root `CLAUDE.md` for both rules in full.
 
-The live E2E tests deliberately never confirm or cancel a real order. See
-`tests/TEST.md` for the full plan, the reasoning, and the recorded coverage gaps.
+The live E2E tests never confirm an order — that would charge the account. They do create a
+real draft order and cancel it again as cleanup, so the only order they cancel is the one they
+made themselves; cancelling a draft is free and leaves no residue. See `tests/TEST.md` for the
+full plan, the reasoning, and the recorded coverage gaps.
 
 ## Relationship to the MCP server in this repo
 

@@ -202,8 +202,8 @@ backend E2E.
 ```bash
 export PRINTFUL_API_KEY=...            # supplied by the operator
 export PRINTFUL_STORE_ID=1135966       # Fatherhood University
-PATH="$PWD/.venv/bin:$PATH" CLI_ANYTHING_FORCE_INSTALLED=1 \
-  python -m pytest agent-harness/cli_anything/printful/tests/ -v -s
+PATH="$PWD/.venv/bin:$PATH" PRINTFUL_FORCE_INSTALLED=1 \
+  python -m pytest src/printful_cli/tests/ -v -s
 ```
 
 ```

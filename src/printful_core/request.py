@@ -25,6 +25,11 @@ class Request:
         # keeps every endpoint builder free of the same three-line dance.
         cleaned = {k: v for k, v in (self.params or {}).items() if v is not None}
         object.__setattr__(self, "params", cleaned)
+        # A frozen Request that aliases the caller's body is not frozen in the
+        # way callers read it: mutating that dict afterwards changes what gets
+        # sent. Copy it here so no builder has to remember to.
+        if self.json is not None:
+            object.__setattr__(self, "json", dict(self.json))
 
     def with_params(self, **extra: Any) -> "Request":
         """Return a copy with additional query parameters."""

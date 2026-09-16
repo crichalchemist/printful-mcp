@@ -22,6 +22,14 @@ def test_none_params_are_dropped():
     assert req.params == {"limit": 5}
 
 
+def test_mutating_the_caller_s_body_does_not_change_the_request():
+    body = {"recipient": {"name": "Ada"}}
+    req = Request("POST", "/orders", json=body)
+    body["recipient"] = {"name": "Grace"}
+    body["external_id"] = "swapped-after-the-fact"
+    assert req.json == {"recipient": {"name": "Ada"}}
+
+
 def test_with_params_returns_a_new_request():
     original = Request("GET", "/countries", params={"limit": 20})
     updated = original.with_params(offset=40)

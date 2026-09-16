@@ -162,7 +162,8 @@ These use Printful's public v2 API:
 **A:** Run the test suite:
 ```bash
 export PRINTFUL_API_KEY=your-key
-python test_server.py
+export PRINTFUL_STORE_ID=your-store-id  # required for an Account-level token
+.venv/bin/python -m pytest -m live
 ```
 
 If you get permission errors, you need to add more scopes.
@@ -185,7 +186,7 @@ If you get permission errors, you need to add more scopes.
     [ ] View all store products
 [ ] Copy the API key
 [ ] Add to .env file: PRINTFUL_API_KEY=...
-[ ] Test: python test_server.py
+[ ] Test: .venv/bin/python -m pytest -m live
 ```
 
 Done! 🎉

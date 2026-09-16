@@ -30,6 +30,11 @@ system interpreter, whose global site-packages registers a `langsmith` plugin th
 `pytest_cmdline_parse` before collecting anything. That traceback is the interpreter, not this
 repository.
 
+**Do not pass a directory path to run "the suite."** An explicit path argument overrides
+`testpaths`, so `pytest tests/` collects three cases out of the whole suite, reports
+`3 passed`, and runs none of the MCP adapter tests. (A path to one file, as in the line above,
+is fine — that's running one file on purpose, not standing in for the suite.)
+
 - **The offline suite must pass with `PRINTFUL_API_KEY` and `PRINTFUL_STORE_ID` unset.** If a
   test needs credentials, it is a live test and belongs behind the marker.
 - **Unsetting the variable does not prove that.** `server.py` calls `load_dotenv()` at import,
@@ -51,16 +56,6 @@ repository.
 - **Mockup creation is opt-in behind `PRINTFUL_E2E_MOCKUPS=1`.** Printful rate-limits new stores
   to 2 requests per 60 seconds with a 60-second lockout. Do not set the flag to make more tests
   run.
-
-**Do not run `./run-tests.sh`** in an agent session — it is an interactive `read -p` menu and
-will hang.
-
-**The three root-level `test_*.py` scripts are dead.** `test_server.py`,
-`test_comprehensive.py` and `test_complete.py` import `printful_mcp.client`, which no longer
-exists, and call tools with a signature that changed. They are excluded from collection by
-`testpaths`, so the suite is unaffected. They are superseded by the suites under
-`src/*/tests/` and are pending deletion along with the README text that still recommends them.
-Do not repair them; do not cite them.
 
 ## Architecture
 

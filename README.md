@@ -400,7 +400,7 @@ Detailed token configuration guide
 </td>
 <td align="center" width="33%">
 
-### 🧪 [Testing Guide](TESTING.md)
+### 🧪 [Testing Guide](CLAUDE.md#tests)
 Learn how to test your integration
 
 </td>
@@ -414,7 +414,7 @@ Required permissions explained
 </td>
 <td align="center" width="33%">
 
-### 💻 [Examples](examples.py)
+### 💻 [Examples](#usage-examples)
 Real code examples
 
 </td>
@@ -563,12 +563,11 @@ PRINTFUL_API_KEY=your-actual-key-here
 Automated test suite
 
 ```bash
-export PRINTFUL_API_KEY=your-key
-python test_server.py
+.venv/bin/python -m pytest
 ```
 
-✅ Tests 6 core features
-⏱️ Takes 30 seconds
+✅ Runs the full offline suite
+⏱️ No credentials needed
 
 </td>
 <td align="center" width="33%">
@@ -603,7 +602,7 @@ Just ask:
 </tr>
 </table>
 
-**📖 Full testing guide:** See [TESTING.md](TESTING.md) for comprehensive testing instructions.
+**📖 Full testing guide:** See [CLAUDE.md](CLAUDE.md#tests) for comprehensive testing instructions.
 
 ---
 

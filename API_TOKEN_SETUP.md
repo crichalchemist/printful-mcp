@@ -241,7 +241,8 @@ For Claude Desktop (`~/Library/Application Support/Claude/claude_desktop_config.
 For testing only:
 ```bash
 export PRINTFUL_API_KEY=your-actual-token-here
-python test_server.py
+export PRINTFUL_STORE_ID=your-store-id
+.venv/bin/python -m pytest -m live
 ```
 
 **Note:** This only lasts for your current terminal session.
@@ -289,19 +290,12 @@ After setting up your token, test it:
 # Set your token
 export PRINTFUL_API_KEY=your-token-here
 
-# Run the test suite
-python test_server.py
+# Run the live test suite (an account-level token also needs PRINTFUL_STORE_ID
+# exported, or store-scoped calls are rejected)
+.venv/bin/python -m pytest -m live
 ```
 
-Expected output:
-```
-✓ PASS - Connection & Auth
-✓ PASS - List Countries
-✓ PASS - List Products
-...
-```
-
-If all tests pass, your token is configured correctly! 🎉
+If your token and scopes are configured correctly, the suite reports all tests passing.
 
 ---
 
@@ -329,7 +323,7 @@ Security:
 - [ ] Enabled all recommended scopes
 - [ ] Added token to `.env` file
 - [ ] Verified `.env` is in `.gitignore`
-- [ ] Tested with `python test_server.py`
+- [ ] Tested with `.venv/bin/python -m pytest -m live`
 - [ ] Configured Cursor/Claude Desktop MCP
 
 ---

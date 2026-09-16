@@ -456,7 +456,6 @@ For detailed documentation:
 - [README.md](../../../README.md) - Full setup and usage guide
 - [QUICKSTART.md](../../../QUICKSTART.md) - 3-minute setup
 - [API_TOKEN_SETUP.md](../../../API_TOKEN_SETUP.md) - API key configuration
-- [TESTING.md](../../../TESTING.md) - Testing strategies
 
 For support:
 - GitHub Issues: Report bugs or request features

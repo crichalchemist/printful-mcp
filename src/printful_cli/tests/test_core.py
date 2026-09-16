@@ -489,6 +489,19 @@ class TestMockups:
         with pytest.raises(PrintfulError, match="t7"):
             mockups_mod.wait_for_task(t, "t7", max_wait=0.01, interval=0)
 
+    def test_wait_timeout_tells_the_user_the_command_that_resumes_the_task(self):
+        """The core states the timeout; naming `mockup status` is the CLI's job.
+
+        A mockup task outlives the command that was watching it, so this string
+        is the whole difference between a dead end and a recoverable one. It is
+        asserted whole because only the CLI can name a CLI command.
+        """
+        t = FakeTransport([{"data": {"status": "pending"}} for _ in range(5)])
+        with pytest.raises(PrintfulError) as caught:
+            mockups_mod.wait_for_task(t, "t7", max_wait=0.01, interval=0)
+        assert caught.value.message == ("Mockup task t7 still pending after 0.01s. "
+                                        "Re-check with: mockup status t7")
+
     def test_templates_ask_for_one_product_not_a_page(self):
         """printful_core.endpoints.stores.list_templates shares this name and
         takes (limit, offset) — a product ID there binds silently to limit."""

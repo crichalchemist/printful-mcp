@@ -41,7 +41,8 @@ def wait_for_task(transport: SyncTransport, task_id: str,
     """Poll a mockup task until it completes or fails."""
     return polling.poll_mockup_task(
         endpoints.get_task(task_id), transport.send, task_id,
-        max_wait, interval)
+        max_wait, interval,
+        recovery_hint=f"Re-check with: mockup status {task_id}")
 
 
 def list_styles(transport: SyncTransport, product_id: int) -> Dict[str, Any]:

@@ -10,6 +10,10 @@ kinds report failure under different keys and say different things on timeout â€
 so each keeps its own driver rather than being forced through one parameterized
 message builder. The drivers own the deadline, the sleep and the strings; they
 contain no branching logic of their own.
+
+What a driver will not say is what the caller should do next. Recovery advice
+names a command, and the CLI's commands are not the MCP server's, so a caller
+that has one passes it in.
 """
 from __future__ import annotations
 
@@ -111,20 +115,32 @@ def _mockup_failure(task_id: str, body: Dict[str, Any]) -> PrintfulError:
     )
 
 
-def _mockup_timeout(task_id: str, max_wait: float,
-                    latest: Dict[str, Any]) -> PrintfulError:
+def _mockup_timeout(task_id: str, max_wait: float, latest: Dict[str, Any],
+                    recovery_hint: str) -> PrintfulError:
+    """A timeout, plus whatever the caller tells its own users to do next.
+
+    A mockup task outlives the call that was watching it, so the message is
+    only useful if it says how to pick the task back up. How to do that is the
+    caller's to say -- the CLI names a shell command, and an MCP client has no
+    shell to run one in -- so the core states the timeout and stops there.
+    """
+    message = f"Mockup task {task_id} still pending after {max_wait}s."
+    if recovery_hint:
+        message = f"{message} {recovery_hint}"
     return PrintfulError(
-        f"Mockup task {task_id} still pending after {max_wait}s. "
-        f"Re-check with: mockup status {task_id}",
+        message,
         detail={"task_id": task_id, "last_response": latest},
     )
 
 
 def poll_mockup_task(request: Request,
                      send: Callable[[Request], Dict[str, Any]],
-                     task_id: str, max_wait: float,
-                     interval: float) -> Dict[str, Any]:
-    """Re-send `request` until the mockup task completes or fails."""
+                     task_id: str, max_wait: float, interval: float,
+                     recovery_hint: str = "") -> Dict[str, Any]:
+    """Re-send `request` until the mockup task completes or fails.
+
+    `recovery_hint` is appended to the timeout message after a single space.
+    """
     deadline = time.monotonic() + max_wait
     latest: Dict[str, Any] = {}
     while time.monotonic() < deadline:
@@ -136,14 +152,14 @@ def poll_mockup_task(request: Request,
         if status == "failed":
             raise _mockup_failure(task_id, body)
         time.sleep(interval)
-    raise _mockup_timeout(task_id, max_wait, latest)
+    raise _mockup_timeout(task_id, max_wait, latest, recovery_hint)
 
 
 async def poll_mockup_task_async(
         request: Request,
         send: Callable[[Request], Awaitable[Dict[str, Any]]],
-        task_id: str, max_wait: float,
-        interval: float) -> Dict[str, Any]:
+        task_id: str, max_wait: float, interval: float,
+        recovery_hint: str = "") -> Dict[str, Any]:
     """`poll_mockup_task` over an awaitable sender."""
     deadline = time.monotonic() + max_wait
     latest: Dict[str, Any] = {}
@@ -156,4 +172,4 @@ async def poll_mockup_task_async(
         if status == "failed":
             raise _mockup_failure(task_id, body)
         await asyncio.sleep(interval)
-    raise _mockup_timeout(task_id, max_wait, latest)
+    raise _mockup_timeout(task_id, max_wait, latest, recovery_hint)

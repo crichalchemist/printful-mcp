@@ -212,8 +212,26 @@ def test_mockup_failure_says_so_when_printful_gives_no_reason():
     assert error.message == "Mockup task t1 failed: no reason given"
 
 
+HINT = "Re-check with: mockup status t7"
+
+
 async def test_mockup_drivers_report_the_same_timeout_with_the_recovery_hint():
     """The hint is the only way a user recovers a task the CLI stopped watching."""
+    sync_error = raised(poll_mockup_task, REQUEST,
+                        make_sender([], tail=MOCKUP_PENDING), "t7", 0.01, 0, HINT)
+    async_error = await raised_async(
+        poll_mockup_task_async, REQUEST,
+        make_async_sender([], tail=MOCKUP_PENDING), "t7", 0.01, 0, HINT)
+
+    assert sync_error.message == async_error.message
+    assert sync_error.detail == async_error.detail
+    assert sync_error.message == ("Mockup task t7 still pending after 0.01s. "
+                                  "Re-check with: mockup status t7")
+    assert sync_error.detail == {"task_id": "t7", "last_response": MOCKUP_PENDING}
+
+
+async def test_mockup_timeout_without_a_hint_does_not_trail_a_space():
+    """A caller with no recovery advice gets a sentence, not a sentence plus room."""
     sync_error = raised(poll_mockup_task, REQUEST,
                         make_sender([], tail=MOCKUP_PENDING), "t7", 0.01, 0)
     async_error = await raised_async(
@@ -221,10 +239,22 @@ async def test_mockup_drivers_report_the_same_timeout_with_the_recovery_hint():
         make_async_sender([], tail=MOCKUP_PENDING), "t7", 0.01, 0)
 
     assert sync_error.message == async_error.message
-    assert sync_error.detail == async_error.detail
-    assert sync_error.message == ("Mockup task t7 still pending after 0.01s. "
-                                  "Re-check with: mockup status t7")
-    assert sync_error.detail == {"task_id": "t7", "last_response": MOCKUP_PENDING}
+    assert sync_error.message == "Mockup task t7 still pending after 0.01s."
+
+
+def test_mockup_timeout_joins_the_hint_with_exactly_one_space():
+    error = raised(poll_mockup_task, REQUEST,
+                   make_sender([], tail=MOCKUP_PENDING), "t7", 0.01, 0, "Do X.")
+    assert error.message == "Mockup task t7 still pending after 0.01s. Do X."
+
+
+def test_the_core_names_no_cli_command():
+    """The MCP server has no shell; a core default must not send it to one."""
+    import inspect
+
+    import printful_core.polling as polling_module
+
+    assert "mockup status" not in inspect.getsource(polling_module)
 
 
 async def test_mockup_timeout_before_the_first_reread_has_no_response_to_show():

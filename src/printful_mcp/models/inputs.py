@@ -54,6 +54,31 @@ class GetProductAvailabilityInput(BaseModel):
     format: Literal["markdown", "json"] = Field(default="markdown", description="Output format")
 
 
+class ListCategoriesInput(BaseModel):
+    """Input for printful_list_categories."""
+    limit: int = Field(default=20, ge=1, le=100, description="Categories per page")
+    offset: int = Field(default=0, ge=0, description="Pagination offset")
+    format: Literal["markdown", "json"] = Field(
+        default="markdown", description="Response format")
+
+
+class GetCategoryInput(BaseModel):
+    """Input for printful_get_category."""
+    category_id: int = Field(description="Catalog category ID")
+    format: Literal["markdown", "json"] = Field(
+        default="markdown", description="Response format")
+
+
+class GetSizeGuideInput(BaseModel):
+    """Input for printful_get_size_guide."""
+    product_id: int = Field(description="Catalog product ID")
+    unit: Optional[str] = Field(
+        default=None,
+        description="Measurement unit: 'inches' or 'cm'. Omit for the API default.")
+    format: Literal["markdown", "json"] = Field(
+        default="markdown", description="Response format")
+
+
 # Order Models
 class CreateOrderInput(BaseModel):
     """Input for creating an order."""

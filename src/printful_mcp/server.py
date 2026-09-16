@@ -8,12 +8,16 @@ from mcp.server.fastmcp import FastMCP
 from dotenv import load_dotenv
 
 from .client import PrintfulClient
+from .transport import get_transport
 from .models.inputs import (
     ListCatalogProductsInput,
     GetProductInput,
     GetProductVariantsInput,
     GetVariantPricesInput,
     GetProductAvailabilityInput,
+    GetCategoryInput,
+    GetSizeGuideInput,
+    ListCategoriesInput,
     CreateOrderInput,
     GetOrderInput,
     ConfirmOrderInput,
@@ -77,7 +81,7 @@ async def printful_list_catalog_products(params: ListCatalogProductsInput) -> st
     Returns a list of available products including t-shirts, mugs, posters, etc.
     Use filters to narrow down by category, color, technique, or product type.
     """
-    return await catalog.list_catalog_products(get_client(), params)
+    return await catalog.list_catalog_products(get_transport(), params)
 
 
 @mcp.tool(
@@ -97,7 +101,7 @@ async def printful_get_product(params: GetProductInput) -> str:
     Returns placements (where designs can be printed), techniques (DTG, embroidery, etc.),
     available sizes/colors, and design requirements.
     """
-    return await catalog.get_product(get_client(), params)
+    return await catalog.get_product(get_transport(), params)
 
 
 @mcp.tool(
@@ -117,7 +121,7 @@ async def printful_get_product_variants(params: GetProductVariantsInput) -> str:
     Each variant has a unique ID needed for ordering. Returns variant IDs,
     names, sizes, colors, and preview images.
     """
-    return await catalog.get_product_variants(get_client(), params)
+    return await catalog.get_product_variants(get_transport(), params)
 
 
 @mcp.tool(
@@ -137,7 +141,7 @@ async def printful_get_variant_prices(params: GetVariantPricesInput) -> str:
     Returns base prices by technique, placement costs, and quantity discounts.
     Helps calculate total order costs before ordering.
     """
-    return await catalog.get_variant_prices(get_client(), params)
+    return await catalog.get_variant_prices(get_transport(), params)
 
 
 @mcp.tool(
@@ -157,7 +161,60 @@ async def printful_get_product_availability(params: GetProductAvailabilityInput)
     Returns in-stock/out-of-stock status for each variant and technique
     by selling region. Critical for displaying product availability.
     """
-    return await catalog.get_product_availability(get_client(), params)
+    return await catalog.get_product_availability(get_transport(), params)
+
+
+@mcp.tool(
+    name="printful_list_categories",
+    annotations={
+        "title": "List Catalog Categories",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    }
+)
+async def printful_list_categories(params: ListCategoriesInput) -> str:
+    """
+    List the catalog's product categories.
+
+    Category IDs are what printful_list_catalog_products filters on.
+    """
+    return await catalog.list_categories(get_transport(), params)
+
+
+@mcp.tool(
+    name="printful_get_category",
+    annotations={
+        "title": "Get Catalog Category",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    }
+)
+async def printful_get_category(params: GetCategoryInput) -> str:
+    """
+    Get one catalog category by ID.
+    """
+    return await catalog.get_category(get_transport(), params)
+
+
+@mcp.tool(
+    name="printful_get_size_guide",
+    annotations={
+        "title": "Get Product Size Guide",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    }
+)
+async def printful_get_size_guide(params: GetSizeGuideInput) -> str:
+    """
+    Get the size tables for a catalog product, in inches or centimetres.
+    """
+    return await catalog.get_size_guide(get_transport(), params)
 
 
 # ========== ORDER TOOLS ==========

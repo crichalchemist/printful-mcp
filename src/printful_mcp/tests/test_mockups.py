@@ -1,5 +1,7 @@
 """The mockups adapter."""
 
+import pytest
+
 from printful_mcp.models.inputs import (
     CreateMockupTaskInput,
     GetMockupTaskInput,
@@ -96,6 +98,36 @@ async def test_templates_are_fetched_per_product_and_rendered(transport):
     out = await mockups.list_mockup_templates(transport, ListMockupTemplatesInput(product_id=71))
     assert transport.last.path == "/catalog-products/71/mockup-templates"
     assert "1800x2400" in out
+
+
+async def test_a_partial_task_record_is_reported_not_raised(transport):
+    """A 200 whose task record is missing a key must still read as a string.
+
+    `if not body:` covers the *empty* body, so an empty 2xx short-circuits to
+    `json.dumps` and never reaches this f-string -- which is why
+    test_empty_bodies.py passes while these reads are unguarded. A non-empty
+    body missing one key does reach it, and a subscript there raises KeyError
+    inside a `try` that catches only ValueError and PrintfulError. The MCP
+    client would get a traceback instead of a sentence, for a task Printful
+    really did create.
+    """
+    transport._responses.append({"data": {"status": "pending"}})
+    try:
+        out = await mockups.create_mockup_task(transport, _create())
+    except Exception as exc:  # noqa: BLE001 - must catch any escape to report it via pytest.fail
+        pytest.fail(f"create_mockup_task raised {type(exc).__name__}: {exc} on a record with no id")
+    assert "Task ID: unknown" in out
+    assert "Status: pending" in out
+
+    transport._responses.append({"data": {"id": "m9"}})
+    try:
+        out = await mockups.create_mockup_task(transport, _create())
+    except Exception as exc:  # noqa: BLE001 - must catch any escape to report it via pytest.fail
+        pytest.fail(
+            f"create_mockup_task raised {type(exc).__name__}: {exc} on a record with no status"
+        )
+    assert "Task ID: m9" in out
+    assert "Status: unknown" in out
 
 
 async def test_an_unparseable_variant_id_reads_as_an_error(transport):

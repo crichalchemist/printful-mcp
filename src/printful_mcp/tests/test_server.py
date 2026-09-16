@@ -25,11 +25,18 @@ _SRC = pathlib.Path(__file__).resolve().parents[2]
 # it never appears in this set -- there is no builder for it to exclude.
 UNBOUND_ON_PURPOSE: dict[str, str] = {}
 
-ENDPOINT_MODULES = {"catalog", "files", "mockups", "orders", "shipping", "stores", "sync"}
-# printful_mcp.tools mirrors printful_core.endpoints module-for-module by
-# convention, so the same set names both; kept as a separate name because
-# _delegate_targets and _builders_bound_by_tools read different trees.
-TOOL_MODULES = ENDPOINT_MODULES
+_ENDPOINTS_DIR = _SRC / "printful_core" / "endpoints"
+_TOOLS_DIR = _SRC / "printful_mcp" / "tools"
+
+# Globbed from the directories the names come from, so a module added to either
+# tree joins the set without anyone editing this file. The two trees mirror each
+# other module-for-module by convention, but each set is derived from its own
+# directory rather than aliased to the other: _builders_bound_by_tools matches
+# calls into printful_core.endpoints and _delegate_targets matches calls into
+# printful_mcp.tools, so one name standing for both would hide the day the
+# convention breaks.
+ENDPOINT_MODULES = {p.stem for p in _ENDPOINTS_DIR.glob("*.py") if p.stem != "__init__"}
+TOOL_MODULES = {p.stem for p in _TOOLS_DIR.glob("*.py") if p.stem != "__init__"}
 
 
 def _core_request_builders() -> set:

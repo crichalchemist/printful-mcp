@@ -75,3 +75,22 @@ async def test_an_empty_success_body_is_reported_not_raised(tool_name):
         f"{tool_name} returned before sending anything, so nothing rendered the "
         "empty body. Fix this test's sample input, not the tool."
     )
+    assert result.strip(), (
+        f"{tool_name} returned an empty string for an empty body. A caller cannot "
+        "tell that apart from a tool that did nothing."
+    )
+
+    # Deliberately NOT asserted: that `result` looks like a rendered document --
+    # a "#" heading, an "Error:" or a "✓". Three tools legitimately return none
+    # of those, and a prefix list widened until they pass asserts nothing:
+    #
+    #   printful_create_mockup_task     -> "{}"
+    #   printful_get_mockup_task        -> "No task found with ID 1"
+    #   printful_create_estimation_task -> "Estimation task created.\n\nTask ID: None..."
+    #
+    # The first two short-circuit on `if not body:` and never reach a renderer,
+    # so this file structurally cannot exercise the reads in tools/mockups.py --
+    # test_mockups.py covers those with a non-empty body missing its keys, which
+    # is the shape that actually breaks them. The third does read the body; it
+    # renders prose rather than a heading, which is a fact about the assertion's
+    # shape, not a gap in the tool.

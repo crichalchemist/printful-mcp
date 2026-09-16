@@ -19,9 +19,11 @@ from typing import Dict, Optional, get_args, get_type_hints
 
 _SRC = pathlib.Path(__file__).resolve().parents[2]
 
-# printful_mcp.tools mirrors printful_core.endpoints module-for-module; the same
-# set names both. `test_server.py` reads server.py against this set too.
-_TOOL_MODULES = {"catalog", "files", "mockups", "orders", "shipping", "stores", "sync"}
+# The tools modules a delegate body may call, globbed from the directory itself
+# so a module added later is matched without anyone editing this file.
+# `test_server.py` derives the same set the same way to read server.py.
+_TOOLS_DIR = _SRC / "printful_mcp" / "tools"
+_TOOL_MODULES = {p.stem for p in _TOOLS_DIR.glob("*.py") if p.stem != "__init__"}
 
 # Tools this test cannot construct an input for. Every entry needs a reason.
 # Empty today: every registered tool's required fields are covered by _SAMPLES

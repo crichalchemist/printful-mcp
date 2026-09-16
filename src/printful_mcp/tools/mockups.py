@@ -52,8 +52,8 @@ async def create_mockup_task(transport: AsyncTransport, params: CreateMockupTask
         if not body:
             return json.dumps(data, indent=2)
         return (
-            f"Mockup task created!\n\nTask ID: {body['id']}\n"
-            f"Status: {body['status']}\n\n"
+            f"Mockup task created!\n\nTask ID: {body.get('id', 'unknown')}\n"
+            f"Status: {body.get('status', 'unknown')}\n\n"
             "Use printful_get_mockup_task with this ID to check status and "
             "get mockup URLs."
         )

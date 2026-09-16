@@ -37,6 +37,10 @@ def test_the_json_branch_is_asserted_across_the_whole_surface():
     )
 
 
+# Deliberately no `tool_name in SKIP` check here, unlike test_empty_bodies.py:
+# SKIP names tools whose input cannot be built, and `_minimal_params` already
+# fails on that case with the exact instruction its author needs. Adding the
+# check would turn that loud failure into a silent skip.
 @pytest.mark.parametrize("tool_name", sorted(REGISTERED))
 async def test_the_json_branch_returns_the_body_and_not_prose(tool_name, transport):
     params = sample_input(tool_name, fmt="json")

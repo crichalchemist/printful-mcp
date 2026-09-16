@@ -291,6 +291,11 @@ class TestLiveDraftOrder:
         endpoint gives, and it rejects on the initial POST rather than by
         completing a task with a failure. Estimation is free and places no
         order, so this costs nothing to assert.
+
+        The placements assertion alone cannot support that second clause: a
+        task that was created and then failed for the same reason would also
+        carry "placements" in its message. The prefix assertion below is what
+        tells the two paths apart.
         """
         with pytest.raises(PrintfulError) as exc:
             orders_mod.estimate_costs(
@@ -303,7 +308,18 @@ class TestLiveDraftOrder:
         assert "placements" in exc.value.message, (
             f"Expected the API's own placements message, got {exc.value.message!r}"
         )
-        print(f"\n  Estimate without artwork refused: {exc.value.message}")
+        # Which path rejected. polling._estimation_failure builds its message as
+        # "Order estimation failed: " + the task's failure_reasons; an initial-POST
+        # rejection carries the API's message verbatim through errors.extract_message
+        # with no prefix. Both contain "placements", so only the prefix separates them.
+        assert not exc.value.message.startswith("Order estimation failed: "), (
+            "The estimate was REJECTED BY A POLLED TASK FAILURE, not by the initial "
+            "POST: the message carries polling._estimation_failure's prefix. The API "
+            "therefore accepts the request and fails the task afterwards, so this "
+            "test's docstring claim -- that it rejects on the initial POST -- is "
+            f"false and should be deleted rather than reworded. Got: {exc.value.message!r}"
+        )
+        print(f"\n  Estimate without artwork refused on the initial POST: {exc.value.message}")
 
 
 # --------------------------------------------------------------------------

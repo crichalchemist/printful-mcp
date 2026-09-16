@@ -203,7 +203,8 @@ async def create_estimation_task(
     Start a cost estimate for a would-be order.
 
     Returns a task ID immediately. Read the result with
-    printful_get_estimation_task. Artwork is not required to estimate costs.
+    printful_get_estimation_task. A catalog item must carry placements, as it
+    must for an order; items from other sources need none.
     """
     recipient = {"country_code": params.recipient_country_code}
     if params.recipient_state_code:

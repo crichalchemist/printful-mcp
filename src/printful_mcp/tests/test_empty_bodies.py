@@ -33,8 +33,8 @@ from printful_mcp.tests.toolsamples import REGISTERED, SKIP, sample_input, tool_
 # `body['id']` / `body['status']` reads in tools/mockups.py stayed invisible to
 # this file: only a non-empty body missing a key reaches them, which
 # test_mockups.py supplies. `create_estimation_task` does read the body --
-# `Task ID: None` is a `.get` that found nothing -- it renders prose, not a
-# heading.
+# `Task ID: unknown` is a `.get` whose default fired -- it renders prose rather
+# than a heading, which is why it is pinned here too.
 NOT_A_RENDERED_DOCUMENT = {
     "printful_create_mockup_task": "{}",
     "printful_get_mockup_task": "No task found with ID 1",

@@ -236,7 +236,7 @@ async def printful_create_order(params: CreateOrderInput) -> str:
     Creates an order in draft status with its items. Drafts are not charged
     until confirmed. Each catalog item requires placements (artwork).
     """
-    return await orders.create_order(get_client(), params)
+    return await orders.create_order(get_transport(), params)
 
 
 @mcp.tool(
@@ -256,7 +256,7 @@ async def printful_get_order(params: GetOrderInput) -> str:
     Returns order status, recipient, costs, items, and shipment info.
     Use order ID or external ID (prefix with @).
     """
-    return await orders.get_order(get_client(), params)
+    return await orders.get_order(get_transport(), params)
 
 
 @mcp.tool(
@@ -264,7 +264,7 @@ async def printful_get_order(params: GetOrderInput) -> str:
     annotations={
         "title": "Confirm Order for Fulfillment",
         "readOnlyHint": False,
-        "destructiveHint": False,
+        "destructiveHint": True,
         "idempotentHint": False,
         "openWorldHint": True,
     }
@@ -272,11 +272,11 @@ async def printful_get_order(params: GetOrderInput) -> str:
 async def printful_confirm_order(params: ConfirmOrderInput) -> str:
     """
     Confirm an order to start production and fulfillment.
-    
+
     Moves order from draft to pending status. Order will be charged and
     sent to production. Cannot be undone easily.
     """
-    return await orders.confirm_order(get_client(), params)
+    return await orders.confirm_order(get_transport(), params)
 
 
 @mcp.tool(
@@ -295,7 +295,7 @@ async def printful_list_orders(params: ListOrdersInput) -> str:
     
     Returns paginated list of orders with status, costs, and item counts.
     """
-    return await orders.list_orders(get_client(), params)
+    return await orders.list_orders(get_transport(), params)
 
 
 # ========== SHIPPING TOOLS ==========

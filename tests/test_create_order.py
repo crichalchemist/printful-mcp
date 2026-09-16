@@ -6,17 +6,16 @@ from printful_mcp.models.inputs import CreateOrderInput
 from printful_mcp.tools.orders import create_order
 
 
-class RecordingClient:
-    """Captures the payload instead of sending it."""
+class RecordingTransport:
+    """Records the Request instead of the posted body."""
 
     def __init__(self):
-        self.posted = None
+        self.sent = []
 
-    async def post(self, endpoint, json_data, **kwargs):
-        self.posted = {"endpoint": endpoint, "json": json_data}
-        return {"data": {"id": 1, "status": "draft", "recipient": {}, "costs": {},
-                          "created_at": "2026-01-01T00:00:00Z",
-                          "updated_at": "2026-01-01T00:00:00Z"}}
+    async def send(self, request, extra_headers=None):
+        self.sent.append(request)
+        return {"data": {"id": 1, "status": "draft",
+                         "created_at": "2026-01-01", "updated_at": "2026-01-01"}}
 
 
 def _recipient_kwargs():
@@ -32,7 +31,7 @@ def _recipient_kwargs():
 
 @pytest.mark.asyncio
 async def test_order_items_reach_the_request():
-    client = RecordingClient()
+    transport = RecordingTransport()
     params = CreateOrderInput(
         items_json=json.dumps([
             {"source": "catalog", "catalog_variant_id": 4012, "quantity": 2,
@@ -42,8 +41,8 @@ async def test_order_items_reach_the_request():
         ]),
         **_recipient_kwargs(),
     )
-    await create_order(client, params)
-    items = client.posted["json"]["order_items"]
+    await create_order(transport, params)
+    items = transport.sent[0].json["order_items"]
     assert len(items) == 1
     assert items[0]["catalog_variant_id"] == 4012
     assert items[0]["quantity"] == 2
@@ -52,22 +51,25 @@ async def test_order_items_reach_the_request():
 @pytest.mark.asyncio
 async def test_catalog_item_without_placements_is_rejected_before_sending():
     """Printful returns 'Property placements is required'. Fail early instead."""
-    client = RecordingClient()
+    transport = RecordingTransport()
     params = CreateOrderInput(
         items_json=json.dumps([
             {"source": "catalog", "catalog_variant_id": 4012, "quantity": 1}
         ]),
         **_recipient_kwargs(),
     )
-    result = await create_order(client, params)
-    assert "placements" in result
-    assert client.posted is None
+    result = await create_order(transport, params)
+    assert "order_items[0]" in result
+    assert "variant 4012" in result
+    assert "no placements" in result
+    assert '"placement":"front"' in result      # the hint the MCP surface adds
+    assert transport.sent == []
 
 
 @pytest.mark.asyncio
 async def test_invalid_json_is_reported_clearly():
-    client = RecordingClient()
+    transport = RecordingTransport()
     params = CreateOrderInput(items_json="not json", **_recipient_kwargs())
-    result = await create_order(client, params)
+    result = await create_order(transport, params)
     assert "valid JSON" in result
-    assert client.posted is None
+    assert transport.sent == []

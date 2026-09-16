@@ -185,3 +185,77 @@ def size_guide(data: Dict[str, Any], product_id: int) -> str:
             lines.append(f"- **{measurement.get('type_label', '')}** — {values}")
         lines.append("")
     return "\n".join(lines)
+
+
+def order(body: Dict[str, Any]) -> str:
+    """One order."""
+    lines = [
+        f"# Order {body['id']}",
+        f"",
+        f"**Status:** {body['status']}",
+        f"**External ID:** {body.get('external_id', 'N/A')}",
+        f"**Created:** {body['created_at']}",
+        f"**Updated:** {body['updated_at']}",
+        f"",
+    ]
+    if body.get('recipient'):
+        recipient = body['recipient']
+        lines.extend([
+            "## Recipient",
+            f"**Name:** {recipient['name']}",
+            f"**Address:** {recipient['address1']}",
+            f"**City:** {recipient['city']}, {recipient.get('state_code', '')} "
+            f"{recipient['zip']}",
+            f"**Country:** {recipient['country_name']} ({recipient['country_code']})",
+            f"",
+        ])
+    if body.get('costs'):
+        costs = body['costs']
+        if costs['calculation_status'] == 'done':
+            lines.extend([
+                "## Costs",
+                f"**Currency:** {costs['currency']}",
+                f"**Subtotal:** {costs['subtotal']}",
+                f"**Shipping:** {costs['shipping']}",
+                f"**Tax:** {costs['tax']}",
+                f"**Total:** {costs['total']}",
+                f"",
+            ])
+        else:
+            lines.extend(["## Costs", f"**Status:** {costs['calculation_status']}", f""])
+    if body.get('order_items'):
+        lines.append(f"## Order Items ({len(body['order_items'])})")
+        for item in body['order_items']:
+            lines.extend([
+                f"- **Item {item['id']}**: {item.get('name', 'N/A')}",
+                f"  - Variant: {item.get('catalog_variant_id', 'N/A')}",
+                f"  - Quantity: {item['quantity']}",
+                f"  - Price: {item.get('price', 'N/A')} {item.get('currency', '')}",
+            ])
+        lines.append("")
+    return "\n".join(lines)
+
+
+def orders(data: Dict[str, Any]) -> str:
+    """A page of orders."""
+    rows = data.get('data', [])
+    paging = data.get('paging', {})
+    lines = [
+        f"# Orders ({paging.get('total', 0)} total)",
+        f"",
+        f"Showing {len(rows)} orders (offset: {paging.get('offset', 0)}, "
+        f"limit: {paging.get('limit', 20)})",
+        f"",
+    ]
+    for row in rows:
+        costs = row.get('costs', {})
+        lines.extend([
+            f"## Order {row['id']}",
+            f"- **Status:** {row['status']}",
+            f"- **External ID:** {row.get('external_id', 'N/A')}",
+            f"- **Total:** {costs.get('total', 'Calculating...')} {costs.get('currency', '')}",
+            f"- **Items:** {len(row.get('order_items', []))}",
+            f"- **Created:** {row['created_at']}",
+            f"",
+        ])
+    return "\n".join(lines)

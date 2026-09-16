@@ -123,6 +123,9 @@ class ListOrdersInput(BaseModel):
     """Input for listing orders."""
     limit: Optional[int] = Field(default=20, ge=1, le=100, description="Number of results per page")
     offset: Optional[int] = Field(default=0, ge=0, description="Number of results to skip")
+    status: Optional[str] = Field(
+        default=None,
+        description="Filter by order status, e.g. 'draft', 'pending', 'fulfilled'")
     format: Literal["markdown", "json"] = Field(default="markdown", description="Output format")
 
 

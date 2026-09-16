@@ -611,7 +611,9 @@ printful-mcp/
 ├── .claude-plugin/           plugin.json and marketplace.json
 ├── .codex-plugin/            plugin.json and INSTALL.md
 ├── .mcp.json                 uvx-based zero-install server entry
-├── scripts/bump-version.sh   version bump across the manifests
+├── .github/workflows/        ci.yml — test, parity, manifest, drift and live jobs
+├── .pre-commit-config.yaml   ruff and the manifest check, on staged files
+├── scripts/                  bump-version.sh and check_manifests.py
 ├── pyproject.toml
 └── LICENSE
 ```
@@ -630,15 +632,20 @@ Before opening a pull request:
 
 ```bash
 .venv/bin/python -m pytest
-.venv/bin/python -m ruff check src/
-.venv/bin/python -m ruff format --check src/
+.venv/bin/python -m ruff check src/ tests/ scripts/
+.venv/bin/python -m ruff format --check src/ tests/ scripts/
 ```
 
-Those are scoped to `src/`, which is clean, because the repository-wide form is not clean yet:
-`ruff check .` reports two findings in `tests/test_create_order.py`, and `ruff format --check .`
-would reformat that file plus three planning documents under `docs/superpowers/plans/`. Those
-are known and are being cleaned up separately — do not treat them as something your change
-broke, and do not fix them in an unrelated pull request.
+That is the scope CI runs, and it is the test boundary: `testpaths` covers `src/` and `tests/`,
+and `scripts/` holds the manifest checker. All three are clean.
+
+**The repository-wide form is not a stricter version of it.** `ruff format --check .` walks 95
+files to the gate's 80, and all fifteen extras are Markdown — ruff formats Python inside fenced
+code blocks. Four sit under `docs/superpowers/`, which is the execution record of earlier plans;
+ruff would rewrite three of them, and no gate may touch them. The other eleven are **not covered
+by any gate** — unguarded rather than deliberately excluded. So run the scoped commands above,
+treat a repository-wide finding as out of scope for your change, and do not fix one in an
+unrelated pull request.
 
 Adding an MCP tool means touching three files, in this order: `models/inputs.py`,
 `tools/<domain>.py`, then a delegate in `server.py`. The parity test will tell you if you

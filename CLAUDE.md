@@ -70,15 +70,31 @@ is fine — that's running one file on purpose, not standing in for the suite.)
 ### Lint
 
 ```bash
-.venv/bin/ruff check src/            # lint
-.venv/bin/ruff format --check src/   # formatting, non-mutating
-.venv/bin/ruff format src/           # formatting, applied
+.venv/bin/ruff check src/ tests/ scripts/            # lint
+.venv/bin/ruff format --check src/ tests/ scripts/   # formatting, non-mutating
+.venv/bin/ruff format src/ tests/ scripts/           # formatting, applied
 ```
 
 Both gates must be clean before a commit. The selected rules and the 100-column line length
 live in `pyproject.toml` under `[tool.ruff]` — change them there, not with per-file ignores.
-There is no CI workflow and no pre-commit hook in this repository, so nothing runs these for
-you.
+
+**That scope is the test boundary, and both narrowing and widening it have already caused
+bugs.** `testpaths` runs `src/` and `tests/`, and `scripts/` holds `check_manifests.py`;
+`.github/workflows/ci.yml` and `.pre-commit-config.yaml` use exactly this scope. Linting only
+`src/` is how `tests/test_create_order.py` sat inside the default suite with two ruff findings
+and nothing checking it. Widening to `.` is not the fix: ruff formats Python inside Markdown
+fences, and the plan documents under `docs/superpowers/` are an execution record that no gate
+may rewrite.
+
+**CI runs these for you; the pre-commit hook does not install itself.**
+`.github/workflows/ci.yml` runs both ruff gates and the offline suite on Python 3.10, 3.11 and
+3.12 on every push and pull request, plus a parity job, a manifest job, and two scheduled jobs.
+`.pre-commit-config.yaml` is in the repository, but `.git/hooks/` is never version-controlled
+and `pre-commit` is not in the `[dev]` extra, so a fresh clone has no hook until you add one:
+
+```bash
+pip install pre-commit && pre-commit install
+```
 
 ## Architecture
 

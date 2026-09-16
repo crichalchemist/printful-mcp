@@ -36,7 +36,7 @@ async def create_mockup_task(transport: AsyncTransport,
         variant_ids = _ids(params.variant_ids)
         style_ids = _ids(params.mockup_style_ids) if params.mockup_style_ids else None
     except ValueError as e:
-        return f"Error parsing input: {e}"
+        return f"Error: {e}"
 
     try:
         request = mockups.create_task(

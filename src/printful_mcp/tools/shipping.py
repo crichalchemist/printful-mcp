@@ -26,6 +26,9 @@ async def calculate_shipping_rates(transport: AsyncTransport,
                 '[{"catalog_variant_id": 4011, "quantity": 1, "source": "catalog"}]')
     if not isinstance(items, list) or not items:
         return "Error: items_json must be a non-empty JSON array of order items."
+    if not all(isinstance(item, dict) for item in items):
+        return ("Error: every entry in items_json must be a JSON object, "
+                'e.g. [{"catalog_variant_id": 4012, "quantity": 1}].')
 
     recipient = {"country_code": params.recipient_country_code}
     if params.recipient_state_code:

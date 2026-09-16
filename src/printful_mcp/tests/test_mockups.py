@@ -87,3 +87,15 @@ async def test_templates_are_fetched_per_product_and_rendered(transport):
         transport, ListMockupTemplatesInput(product_id=71))
     assert transport.last.path == "/catalog-products/71/mockup-templates"
     assert "1800x2400" in out
+
+
+async def test_an_unparseable_variant_id_reads_as_an_error(transport):
+    """This tool used to answer "Error parsing input: ..." for a bad ID.
+
+    Every other tool prefixes "Error: ", and the live suite asserts success
+    with `not result.startswith("Error:")` -- so under the old wording a parse
+    failure was counted as a passing call.
+    """
+    out = await mockups.create_mockup_task(transport, _create(variant_ids="4011,abc"))
+    assert out.startswith("Error:")
+    assert transport.sent == []

@@ -57,10 +57,11 @@ Repository = "https://github.com/Purple-Horizons/printful-mcp"
 Issues = "https://github.com/Purple-Horizons/printful-mcp/issues"
 
 [tool.pytest.ini_options]
-# The root-level test_*.py files are standalone scripts (run them directly with
-# `python test_server.py`), not pytest modules: they define module-level
-# `async def test_*` with no asyncio mode, so pytest collects them and then
-# fails all 14. Scoping collection to the real suite keeps `pytest` meaningful.
+# The three root-level test_*.py files are dead. They import `printful_mcp.client`,
+# which no longer exists, so pytest fails at collection with ModuleNotFoundError
+# before running a single case -- `asyncio_mode` below is set and is not the cause.
+# Scoping collection to the real suite keeps `pytest` meaningful. They are
+# superseded by the suites under src/*/tests/ and are pending deletion.
 testpaths = ["src/printful_core/tests", "src/printful_cli/tests", "src/printful_mcp/tests", "tests"]
 # Live tests call the real Printful API and need PRINTFUL_API_KEY, so they are
 # not in the default selection — a fresh clone runs the offline suite and gets

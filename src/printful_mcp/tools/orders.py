@@ -54,6 +54,9 @@ async def create_order(transport: AsyncTransport, params: CreateOrderInput) -> s
         return f"Error: items_json must be valid JSON array ({e})."
     if not isinstance(items, list) or not items:
         return "Error: items_json must be a non-empty JSON array of order items."
+    if not all(isinstance(item, dict) for item in items):
+        return ("Error: every entry in items_json must be a JSON object, "
+                'e.g. [{"catalog_variant_id": 4012, "quantity": 1}].')
 
     try:
         request = orders.create_order(recipient, items, external_id=params.external_id)
@@ -99,7 +102,8 @@ async def confirm_order(transport: AsyncTransport, params: ConfirmOrderInput) ->
         if params.format == "json":
             return json.dumps(data, indent=2)
         body = data.get("data", {})
-        return f"✓ Order {body['id']} confirmed successfully!\n\n" + markdown.order(body)
+        return (f"✓ Order {body.get('id', params.order_id)} confirmed successfully!"
+                "\n\n" + markdown.order(body))
     except PrintfulError as e:
         return f"Error: {e.message}"
 
@@ -212,6 +216,9 @@ async def create_estimation_task(transport: AsyncTransport,
         return f"Error: items_json must be valid JSON array ({e})."
     if not isinstance(items, list) or not items:
         return "Error: items_json must be a non-empty JSON array of order items."
+    if not all(isinstance(item, dict) for item in items):
+        return ("Error: every entry in items_json must be a JSON object, "
+                'e.g. [{"catalog_variant_id": 4012, "quantity": 1}].')
 
     try:
         request = orders.create_estimation_task(recipient, items)

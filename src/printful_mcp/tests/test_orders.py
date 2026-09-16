@@ -1,6 +1,8 @@
 """The orders adapter."""
 import json
 
+import pytest
+
 from printful_core.errors import PrintfulError
 from printful_mcp.models.inputs import (
     CancelOrderInput,
@@ -214,3 +216,44 @@ async def test_estimation_does_not_require_artwork(transport):
         items_json=json.dumps(items)))
     assert not out.startswith("Error:")
     assert transport.last.path == "/order-estimation-tasks"
+
+
+async def test_order_items_that_are_not_objects_are_reported_not_raised(transport):
+    """A caller who sends bare IDs must get a sentence, not a traceback.
+
+    `items_json="[1, 2, 3]"` parses as JSON and is a non-empty list, so the
+    existing shape check passed it through to the core, where
+    `_require_placements` calls `.get` on an int and the AttributeError escapes
+    the tool's `try` -- `except ValueError` and `except PrintfulError` catch
+    neither it nor the `TypeError` the same input raises one layer deeper.
+    """
+    try:
+        out = await orders.create_order(
+            transport, CreateOrderInput(items_json="[1, 2, 3]", **_recipient()))
+    except Exception as exc:
+        pytest.fail(f"create_order raised {type(exc).__name__}: {exc} "
+                    "instead of returning a readable error")
+    assert out.startswith("Error:")
+    assert "must be a JSON object" in out
+    assert transport.sent == [], "nothing may be sent for an input this malformed"
+
+
+async def test_an_estimate_names_the_bad_items_instead_of_leaking_dict_internals(transport):
+    """The old answer told the caller about a dictionary update sequence.
+
+    `create_estimation_task` reaches `dict(item)` in the core, which for a list
+    of strings raises ValueError("dictionary update sequence element #0 has
+    length 1; 2 is required"). That was caught and returned, so the tool obeyed
+    the return-don't-raise invariant while telling the caller nothing they
+    could act on. The element-type check pre-empts it; the `except ValueError`
+    stays for the core's own item validation.
+    """
+    try:
+        out = await orders.create_estimation_task(transport, CreateEstimationTaskInput(
+            recipient_country_code="US", items_json='["ab"]'))
+    except Exception as exc:
+        pytest.fail(f"create_estimation_task raised {type(exc).__name__}: {exc} "
+                    "instead of returning a readable error")
+    assert "must be a JSON object" in out
+    assert "dictionary update sequence" not in out
+    assert transport.sent == []

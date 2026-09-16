@@ -134,47 +134,31 @@ Run it:
 python test_manual.py
 ```
 
-## Method 4: Unit Tests (Development)
+## Method 4: The Test Suite
 
-### Create Test Suite
+There is nothing to write. The suite ships with the repository, under
+`src/printful_core/tests/`, `src/printful_cli/tests/` and `src/printful_mcp/tests/`.
 
-```python
-# tests/test_transport_contract.py
-import pytest
-from printful_core.auth import Credentials
-from printful_core.errors import PrintfulAuthError
-
-def test_resolve_requires_api_key(monkeypatch):
-    """Test that credential resolution fails without an API key."""
-    monkeypatch.delenv("PRINTFUL_API_KEY", raising=False)
-    with pytest.raises(PrintfulAuthError, match="No Printful API token"):
-        Credentials.resolve()
-
-@pytest.mark.asyncio
-async def test_transport_sends_the_built_request():
-    """Test that a request built by an endpoint reaches the transport unchanged."""
-    from printful_core.endpoints import catalog
-
-    class RecordingTransport:
-        def __init__(self):
-            self.sent = []
-
-        async def send(self, request, extra_headers=None):
-            self.sent.append(request)
-            return {"data": []}
-
-    transport = RecordingTransport()
-    request = catalog.list_products(limit=5)
-    await transport.send(request)
-    assert transport.sent[0].path == "/catalog-products"
-    assert transport.sent[0].params["limit"] == 5
-```
-
-Run tests:
 ```bash
 pip install -e ".[dev]"
-pytest tests/
+.venv/bin/python -m pytest            # the offline suite: no network, no credentials
+.venv/bin/python -m pytest -m live    # the live API suite
+.venv/bin/python -m pytest -m ""      # everything
+.venv/bin/python -m pytest src/printful_mcp/tests/test_server.py -v   # one file
 ```
+
+**Use `.venv/bin/python -m pytest`, not a bare `pytest`.** A bare invocation resolves to the
+system interpreter, whose global `langsmith` plugin crashes before anything is collected.
+
+**Do not pass a path to run "the tests".** An explicit path argument overrides `testpaths`, so
+`pytest tests/` collects three cases out of the whole suite, reports `3 passed`, and runs none
+of the MCP adapter tests.
+
+`addopts = "-m 'not live'"` keeps the live tests out of the default selection, so a fresh clone
+gets a clean result with no credentials. They are not softened: selected without a key they
+fail loudly rather than skip. The live suite needs `PRINTFUL_STORE_ID` exported as well as
+`PRINTFUL_API_KEY` — the token is account-level, and store-scoped calls are rejected without
+the `X-PF-Store-Id` header.
 
 ## Method 5: Live API Testing
 
@@ -251,7 +235,8 @@ asyncio.run(test_order())
 ### Phase 1: Basic Functionality ✓
 1. Use MCP Inspector to test a few read-only tools
 2. Verify error handling (try invalid product IDs)
-3. Check rate limiting (make many requests quickly)
+3. Do **not** probe rate limiting by making many requests quickly — mockup creation
+   locks a new store out for 60 seconds at 2 requests/60s
 
 ### Phase 2: Integration Testing ✓
 1. Configure in Cursor
@@ -286,7 +271,8 @@ pip install -e .
 3. Check logs: `~/.cursor/logs/`
 
 ### "Rate limit exceeded"
-✅ **Expected:** Printful allows 120 req/min
+✅ **Expected:** Printful allows 120 req/min in general. Mockup creation is far stricter —
+10/60s for an established store, 2/60s for a new one, with a 60-second lockout when exceeded.
 - Wait as indicated in error message
 - This proves rate limiting detection works!
 

@@ -157,8 +157,13 @@ fourteen new operations, its own table said twelve, and the code said thirteen.
   gives `{"items": [...], "paging": {...}}`. A renderer for a v1 endpoint must handle what that
   endpoint actually returns; a v2-shaped `data`/`paging` read silently renders an empty page.
 - **v1 is used only where v2 has no equivalent** — sync products, product templates, tax rates.
-- **Error shapes differ too.** v2 uses RFC 9457 (`detail`, falling back to `title`); v1 uses
-  `error.message`. Both become a `PrintfulError`.
+- **Error shapes do not differ by version, whatever the v2 documentation says.** The docs
+  describe RFC 9457 problem details, but the live API returns the v1-style envelope —
+  `{"data": "<message>", "error": {"reason": ..., "message": ...}}` — for 4xx and for 404 as
+  well. So `errors.extract_message` tries `error.message` **first**, then `detail`, `title`,
+  `data`, `result`, `message`, for both versions: the undocumented shape wins because it is
+  the one that actually arrives, and reading only `detail`/`title` reduces every real error to
+  "Unknown error". All of them become a `PrintfulError`.
 - **429 raises immediately with no retry.** This is deliberate and is a spec non-goal: a silent
   retry walks a user into Printful's 60-second mockup lockout. The client reads `Retry-After`
   into the error and gives up. Do not add backoff.

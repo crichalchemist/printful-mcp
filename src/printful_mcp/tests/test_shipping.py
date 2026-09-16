@@ -1,6 +1,8 @@
 """The shipping adapter, including the pagination defect this tool used to have."""
 import json
 
+import pytest
+
 from printful_mcp.models.inputs import CalculateShippingInput, CalculateTaxInput
 from printful_mcp.tools import shipping
 from printful_mcp.tests.conftest import FakeTransport
@@ -65,4 +67,21 @@ async def test_malformed_items_json_is_reported_not_raised(transport):
     out = await shipping.calculate_shipping_rates(transport, CalculateShippingInput(
         recipient_country_code="US", items_json="not json"))
     assert "valid JSON" in out
+    assert transport.sent == []
+
+
+async def test_shipping_items_that_are_not_objects_are_reported_not_raised(transport):
+    """`{**item}` on an int is a TypeError, which this tool does not catch.
+
+    A quote request with bare variant IDs is a plausible caller mistake, and it
+    reached `calculate_rates`'s source-defaulting comprehension as a traceback.
+    """
+    try:
+        out = await shipping.calculate_shipping_rates(transport, CalculateShippingInput(
+            recipient_country_code="US", items_json="[1, 2, 3]"))
+    except Exception as exc:
+        pytest.fail(f"calculate_shipping_rates raised {type(exc).__name__}: {exc} "
+                    "instead of returning a readable error")
+    assert out.startswith("Error:")
+    assert "must be a JSON object" in out
     assert transport.sent == []

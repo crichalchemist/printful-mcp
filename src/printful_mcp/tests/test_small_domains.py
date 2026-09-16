@@ -142,3 +142,20 @@ async def test_get_sync_product_looks_up_the_requested_product(transport):
     })
     await sync.get_sync_product(transport, GetSyncProductInput(sync_product_id=1))
     assert transport.last.path == "/store/products/1"
+
+
+async def test_sync_products_render_from_the_v1_items_envelope(transport):
+    """v1 returns two shapes here, and only one of them rendered.
+
+    `/store/products` gives a bare list, but the documented
+    `{"items": [...], "paging": {...}}` envelope rendered as "0 shown" -- a
+    populated store reported as empty, with no error. Its sibling
+    `markdown.store_templates` already absorbs both.
+    """
+    transport._responses.append({
+        "items": [{"id": 3, "name": "Summer Tee", "external_id": "ext-3"}],
+        "paging": {"total": 1},
+    })
+    out = await sync.list_sync_products(transport, ListSyncProductsInput())
+    assert "Summer Tee" in out
+    assert "(1 shown)" in out

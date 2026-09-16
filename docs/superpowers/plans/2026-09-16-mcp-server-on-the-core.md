@@ -1096,7 +1096,9 @@ Then `rtk proxy git status --porcelain` and confirm the tree carries none of the
 .venv/bin/python -c "from printful_mcp.server import mcp; import asyncio; print('tools:', len(asyncio.run(mcp.list_tools())))"
 ```
 
-Expected: 22. If `list_tools()` is not the accessor in the installed `mcp` version, find the real one rather than guessing — Task 9 turns this into a test.
+Expected: 22. `mcp.list_tools()` is a coroutine returning `list[Tool]`; this was
+confirmed against the installed `mcp` version, so it is the accessor, not a
+guess. If it raises, the server failed to import and the traceback says why.
 
 - [ ] **Step 10: Run the whole offline suite**
 
@@ -1408,7 +1410,25 @@ Change each of the four order delegates from `get_client()` to `get_transport()`
     return await orders.list_orders(get_transport(), params)
 ```
 
-No new registrations in this task.
+No new registrations in this task, but **one annotation is wrong and gets fixed
+here.** `printful_confirm_order` currently declares:
+
+```python
+        "destructiveHint": False,
+```
+
+It starts fulfillment, charges the account, and cannot be undone. An MCP client
+reads `destructiveHint` to decide whether to prompt a human before running a
+tool, so this value is a safety defect rather than a documentation one. Change
+it to:
+
+```python
+        "destructiveHint": True,
+```
+
+Leave `readOnlyHint: False` and `idempotentHint: False` alone — both are already
+correct. Task 9 asserts this, and Task 4 sets the same field on
+`printful_cancel_order` for the same reason.
 
 - [ ] **Step 5: Update the two upstream-era tests in `tests/`**
 
@@ -1423,8 +1443,16 @@ class RecordingTransport:
 
     async def send(self, request, extra_headers=None):
         self.sent.append(request)
-        return {"data": {"id": 1, "status": "draft", "created_at": "", "updated_at": ""}}
+        return {"data": {"id": 1, "status": "draft",
+                         "created_at": "2026-01-01", "updated_at": "2026-01-01"}}
 ```
+
+That body is the minimum `markdown.order` can render: it reads `id`, `status`,
+`created_at` and `updated_at` unguarded, and everything else behind a
+truthiness check. **Run the test before moving on** — a fake missing one of
+those four raises `KeyError` inside the tool's `try`, which `except
+PrintfulError` does not catch, and the failure reads as a tool bug rather than
+a fixture gap.
 
 Then update each call site from `create_order(client, params)` to
 `create_order(transport, params)`, and each `assert client.posted is None` to
@@ -3040,6 +3068,58 @@ Each module imports `from printful_core.endpoints import files` (or `stores`,
 `from printful_core.format import markdown`, and
 `from printful_core.transport import AsyncTransport`; the `..client` import goes.
 
+One worked body, so the shape above is concrete — this is `tools/files.py` in
+full apart from its second tool:
+
+```python
+"""File library tools for the Printful MCP server."""
+
+import json
+
+from printful_core.endpoints import files
+from printful_core.errors import PrintfulError
+from printful_core.format import markdown
+from printful_core.transport import AsyncTransport
+
+from ..models.inputs import AddFileInput, GetFileInput
+
+
+async def add_file(transport: AsyncTransport, params: AddFileInput) -> str:
+    """
+    Add a file to the Printful file library.
+
+    Returns the file ID used in order placements. Large files come back with
+    status 'waiting' and finish processing asynchronously.
+    """
+    try:
+        request = files.add_file(
+            params.url, filename=params.filename, visible=params.visible)
+        data = await transport.send(request)
+        if params.format == "json":
+            return json.dumps(data, indent=2)
+        return markdown.file_added(data.get("data", {}))
+    except PrintfulError as e:
+        return f"Error: {e.message}"
+
+
+async def get_file(transport: AsyncTransport, params: GetFileInput) -> str:
+    """
+    Get information about a file in the library.
+
+    Returns file details including processing status, dimensions, and URLs.
+    """
+    try:
+        data = await transport.send(files.get_file(params.file_id))
+        if params.format == "json":
+            return json.dumps(data, indent=2)
+        return markdown.file_detail(data.get("data", {}))
+    except PrintfulError as e:
+        return f"Error: {e.message}"
+```
+
+`stores.py` and `sync.py` follow it exactly, swapping the endpoint module, the
+input models, and the renderer named in the table above.
+
 Two module-specific notes:
 
 - **`tools/sync.py` defines `ListSyncProductsInput` and `GetSyncProductInput`
@@ -3168,17 +3248,61 @@ most of them. Before committing, capture the old and new output of one renderer
 per module and compare them as bytes:
 
 ```bash
-.venv/bin/python - <<'PY'
-import subprocess, json
-# Render the same fixture through the pre-move code (git show the old module into
-# a temp file and import it) and the new core renderer, then compare.
-# Print only: OLD == NEW for each of file_detail, stores, sync_product.
-PY
+.venv/bin/python - <<'PYEOF'
+"""Capture each moved renderer's pre-move source and post-move output."""
+import pathlib, subprocess, tempfile
+
+from printful_core.format import markdown
+
+# renderer name -> (source module at HEAD, fixture, whether it takes the envelope)
+CASES = {
+    "file_detail": ("files", {"data": {
+        "id": 9, "status": "ok", "filename": "art.png", "mime_type": "image/png",
+        "created": "2026-01-01", "width": 4500, "height": 5400, "dpi": 300,
+        "size": 1234, "hash": "abc", "url": "https://example.com/art.png",
+        "thumbnail_url": "https://example.com/t.png",
+        "preview_url": "https://example.com/p.png"}}, False),
+    "file_added": ("files", {"data": {
+        "id": 9, "status": "waiting", "url": "https://example.com/art.png"}}, False),
+    "stores": ("stores", {"data": [
+        {"id": 12345678, "name": "Example Store", "type": "native"}]}, True),
+    "store_statistics": ("stores", {"data": {"stats": []}}, True),
+    "sync_products": ("sync", {"data": [{"id": 1, "name": "Tee", "variants": 2,
+        "synced": 2, "thumbnail_url": "https://example.com/t.png"}],
+        "paging": {"total": 1}}, True),
+    "sync_product": ("sync", {"data": {"id": 1, "name": "Tee", "variants": 2,
+        "synced": 2, "thumbnail_url": "https://example.com/t.png"}}, False),
+}
+
+tmp = pathlib.Path(tempfile.mkdtemp())
+seen = set()
+for renderer, (module, fixture, takes_envelope) in CASES.items():
+    if module not in seen:
+        # The pre-move module is still at HEAD -- this task has not committed.
+        src = subprocess.run(
+            ["git", "show", f"HEAD:src/printful_mcp/tools/{module}.py"],
+            capture_output=True, text=True, check=True).stdout
+        (tmp / f"old_{module}.py").write_text(src)
+        print(f"captured HEAD:src/printful_mcp/tools/{module}.py "
+              f"({len(src.splitlines())} lines)")
+        seen.add(module)
+    payload = fixture if takes_envelope else fixture["data"]
+    out = getattr(markdown, renderer)(payload)
+    (tmp / f"new_{renderer}.txt").write_text(out)
+    print(f"  {renderer}() -> {len(out)} chars, {len(out.splitlines())} lines")
+
+print(f"\nWrote pre-move sources and post-move output to {tmp}")
+PYEOF
 ```
 
-Write that script, run it, and paste its output into your report. Plan 1 proved
-a byte-identity claim this way for the mockup timeout message, and it is the
-only check that catches a one-character drift in a string nobody asserts on.
+Run it, then read each `new_<renderer>.txt` against the corresponding markdown
+block in `old_<module>.py`. **Paste the comparison into your report**, naming
+each of the six renderers and whether its output matched. Plan 1 proved a
+byte-identity claim this way for the mockup timeout message, and it is the only
+check that catches a one-character drift in a string nobody asserts on.
+
+If a renderer's output differs, the moved block was edited. Restore the original
+wording; do not update an expectation to match the drift.
 
 - [ ] **Step 7: Run, mutate, commit**
 
@@ -3265,6 +3389,10 @@ These are the tests that make the parity claim checkable. The spec's prose said
 "fourteen operations" and its table said twelve; the code says thirteen. Rather
 than pick a number, this asserts the property the number was trying to express:
 every endpoint the core can build, the server can reach.
+
+`tool.annotations` is a `ToolAnnotations` object with attribute access, and
+`mcp.list_tools()` is a coroutine returning `list[Tool]`. Both were confirmed
+against the installed `mcp` version.
 """
 import ast
 import pathlib
@@ -3273,43 +3401,92 @@ import pytest
 
 from printful_mcp.server import mcp
 
-# Deliberately not exposed as a tool. `files list` reads CLI session state and
-# has no endpoint; the spec's parity table says so explicitly.
-CLI_ONLY = set()
+_SRC = pathlib.Path(__file__).resolve().parents[2]
+
+# Core endpoints deliberately not bound to a tool. Every entry needs a reason.
+# Empty today: `files list` is CLI session state with no endpoint behind it, so
+# it never appears in this set -- there is no builder for it to exclude.
+UNBOUND_ON_PURPOSE: dict[str, str] = {}
+
+ENDPOINT_MODULES = {"catalog", "files", "mockups", "orders", "shipping", "stores", "sync"}
 
 
-def _core_request_builders():
-    """Every `-> Request` function in printful_core.endpoints, by module.name."""
-    root = pathlib.Path(__file__).resolve().parents[2] / "printful_core" / "endpoints"
+def _core_request_builders() -> set:
+    """Every public `-> Request` function in printful_core.endpoints."""
+    root = _SRC / "printful_core" / "endpoints"
     found = set()
     for path in sorted(root.glob("*.py")):
         if path.stem == "__init__":
             continue
         for node in ast.parse(path.read_text()).body:
-            if not isinstance(node, ast.FunctionDef):
+            if not isinstance(node, ast.FunctionDef) or node.name.startswith("_"):
                 continue
-            returns = ast.unparse(node.returns) if node.returns else None
-            if returns == "Request" and not node.name.startswith("_"):
+            if node.returns is not None and ast.unparse(node.returns) == "Request":
                 found.add(f"{path.stem}.{node.name}")
     return found
 
 
-async def _tool_names():
-    return {tool.name for tool in await mcp.list_tools()}
+def _builders_bound_by_tools() -> set:
+    """Every `<endpoint module>.<name>(` call made from printful_mcp.tools."""
+    root = _SRC / "printful_mcp" / "tools"
+    bound = set()
+    for path in sorted(root.glob("*.py")):
+        if path.stem == "__init__":
+            continue
+        for node in ast.walk(ast.parse(path.read_text())):
+            if not isinstance(node, ast.Call):
+                continue
+            fn = node.func
+            if (isinstance(fn, ast.Attribute)
+                    and isinstance(fn.value, ast.Name)
+                    and fn.value.id in ENDPOINT_MODULES):
+                bound.add(f"{fn.value.id}.{fn.attr}")
+    return bound
 
 
-async def test_every_core_endpoint_is_reachable_through_a_tool():
-    """One tool per endpoint the core can build.
+async def _tools():
+    return await mcp.list_tools()
 
-    This replaces counting. A new builder added to printful_core.endpoints with
-    no tool bound to it fails here on the day it is added, which is the only
-    way the parity claim in the README can stay true.
+
+def test_every_core_endpoint_is_bound_by_a_tool():
+    """Name the endpoints no tool calls -- do not just count them.
+
+    Comparing two lengths passes when one builder is unbound and some other
+    builder is bound twice, which is exactly the state a half-finished domain
+    task leaves behind. This compares the sets, so the failure message names
+    the endpoint that has no caller.
     """
-    builders = _core_request_builders()
-    names = await _tool_names()
-    assert len(builders) == len(names) + len(CLI_ONLY), (
-        f"{len(builders)} core endpoints, {len(names)} tools registered. "
-        "Every endpoint needs a tool, or an entry in CLI_ONLY saying why not."
+    missing = _core_request_builders() - _builders_bound_by_tools()
+    missing -= set(UNBOUND_ON_PURPOSE)
+    assert missing == set(), (
+        f"no tool calls these core endpoints: {sorted(missing)}. "
+        "Bind each one, or add it to UNBOUND_ON_PURPOSE with a reason."
+    )
+
+
+def test_no_tool_calls_an_endpoint_that_does_not_exist():
+    """A typo'd builder name fails at runtime, inside a try/except, as a string.
+
+    `catalog.get_categories` (plural) would be an AttributeError swallowed by
+    nothing -- it raises before the request is built and surfaces as a tool
+    that always errors. This catches it without running the tool.
+    """
+    unknown = _builders_bound_by_tools() - _core_request_builders()
+    # `build_catalog_item` is a payload helper, not an endpoint; tools may call it.
+    unknown -= {"orders.build_catalog_item"}
+    assert unknown == set(), f"tools call endpoints the core does not define: {sorted(unknown)}"
+
+
+async def test_one_registered_tool_per_bound_endpoint():
+    """A tool body with no @mcp.tool registration is unreachable.
+
+    The set tests above read the tool modules, which cannot see whether
+    server.py registered anything. This is the half that can.
+    """
+    expected = len(_core_request_builders()) - len(UNBOUND_ON_PURPOSE)
+    names = [tool.name for tool in await _tools()]
+    assert len(names) == expected, (
+        f"{expected} endpoints bound, {len(names)} tools registered: {sorted(names)}"
     )
 
 
@@ -3319,13 +3496,12 @@ async def test_no_tool_name_is_registered_twice():
     Eight tasks appended registrations to one file; a copy-paste that reuses a
     name loses a tool with no error anywhere.
     """
-    names = [tool.name for tool in await mcp.list_tools()]
+    names = [tool.name for tool in await _tools()]
     assert len(names) == len(set(names))
 
 
 async def test_every_tool_is_namespaced():
-    names = await _tool_names()
-    assert all(name.startswith("printful_") for name in names)
+    assert all(tool.name.startswith("printful_") for tool in await _tools())
 
 
 @pytest.mark.parametrize("required", [
@@ -3337,27 +3513,30 @@ async def test_every_tool_declares_the_full_annotation_set(required):
     A missing destructiveHint on printful_cancel_order means a client may run
     it without confirming. That is a safety defect, not a documentation one.
     """
-    for tool in await mcp.list_tools():
-        annotations = tool.annotations
-        assert annotations is not None, f"{tool.name} has no annotations"
-        assert getattr(annotations, required, None) is not None, \
-            f"{tool.name} is missing {required}"
+    for tool in await _tools():
+        assert tool.annotations is not None, f"{tool.name} has no annotations"
+        value = getattr(tool.annotations, required, None)
+        assert value is not None, f"{tool.name} is missing {required}"
 
 
-async def test_the_destructive_tools_are_marked_destructive():
-    """Two tools spend real money or throw work away.
+async def test_the_tools_that_spend_money_are_marked_destructive():
+    """Two tools are irreversible and one of them charges the account.
 
-    printful_confirm_order charges the account. printful_cancel_order cannot be
-    undone. Both must carry destructiveHint so a client prompts first.
+    printful_confirm_order starts fulfillment and bills the card.
+    printful_cancel_order cannot be undone. An MCP client decides whether to
+    prompt a human from these fields alone.
     """
-    by_name = {tool.name: tool for tool in await mcp.list_tools()}
-    assert by_name["printful_cancel_order"].annotations.destructiveHint is True
-    assert by_name["printful_confirm_order"].annotations.readOnlyHint is False
+    by_name = {tool.name: tool for tool in await _tools()}
+    for name in ("printful_confirm_order", "printful_cancel_order"):
+        assert by_name[name].annotations.destructiveHint is True, \
+            f"{name} is destructive and must say so"
+        assert by_name[name].annotations.readOnlyHint is False
 ```
 
-If `tool.annotations` is a dict rather than an object in the installed `mcp`
-version, adapt the accessor — but **do not weaken the assertion to
-`hasattr`**, which passes for a `None` value.
+Three of these tests read source with `ast` rather than importing. That is
+deliberate: importing every tool module to inspect it would run
+`Credentials.resolve()` through any module-level transport access, and these
+tests must pass with no credentials set.
 
 - [ ] **Step 5: Verify the server boots and the count is what the code says**
 
@@ -3372,8 +3551,8 @@ for t in sorted(x.name for x in tools): print('  ', t)
 ```
 
 Expected: 32. If it is not 32, **do not adjust the test to match** — find the
-missing or duplicated registration. The count is a consequence of the bijection,
-not a target.
+missing or duplicated registration. The count is a consequence of the mapping,
+not a target, and Step 4's test names exactly which endpoint is unbound.
 
 - [ ] **Step 6: Run everything and commit**
 
@@ -3617,11 +3796,15 @@ render the same response for two different readers.
 | `sync` and `calculate_tax` are v1 requests | 6, 8 |
 | `create_estimation_task` deliberately skips `_require_placements` | 5 |
 
-**4. Placeholder scan.** One step is deliberately left for the implementer to
-write rather than transcribe: Task 8 Step 6's byte-identity script, because it
-has to import a module out of git history and the exact invocation depends on
-what that module is named at that commit. Every other code step carries the
-code.
+**4. Placeholder scan.** None. Every code step carries its code, including
+Task 8 Step 6's byte-identity capture, which an earlier draft left to the
+implementer on the false premise that the pre-move module path varies — it does
+not; it is `HEAD:src/printful_mcp/tools/<module>.py` at every one of those
+commits.
+
+Two steps end in a judgment the implementer must make and report rather than a
+command that passes or fails: Task 8 Step 6's renderer comparison, and Task 10
+Step 4's live gate. Both say what to paste into the report.
 
 ---
 

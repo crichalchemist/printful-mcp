@@ -454,6 +454,10 @@ def orders_create(ctx, items_json, name, address1, city, state_code, country_cod
         if external_id:
             payload["external_id"] = external_id
         missing = sess.draft.missing_fields()
+        # Drop the draft's per-item complaints: they describe the draft's items,
+        # not the ones passed in --items. This is not "items go unvalidated" —
+        # the core builder still enforces the API's own placements invariant on
+        # whatever is passed here, and rejects locally before any request.
         missing = [m for m in missing if not m.startswith("items")]
         if missing:
             raise ValueError("Recipient incomplete. Missing: " + ", ".join(missing))

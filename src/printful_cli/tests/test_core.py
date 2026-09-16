@@ -382,6 +382,23 @@ class TestOrders:
         assert request.json["order_items"][0]["catalog_variant_id"] == 4012
         assert request.json["external_id"] == "ext-1"
 
+    def test_update_sends_the_changes_it_was_given(self):
+        """Every argument reaches the builder, and an empty change set is refused.
+
+        Without this, `changes` could be dropped or swapped and the suite would
+        stay green — update_order is otherwise unasserted at the CLI layer.
+        """
+        t = FakeTransport([{"data": {"id": 5}}])
+        orders_mod.update_order(t, "123", {"shipping": "STANDARD"})
+        request = t.requests[0]
+        assert request.method == "PATCH"
+        assert request.path == "/orders/123"
+        assert request.json == {"shipping": "STANDARD"}
+
+        with pytest.raises(ValueError, match="at least one field"):
+            orders_mod.update_order(t, "123", {})
+        assert len(t.requests) == 1, "A rejected update must send nothing"
+
     def test_estimate_polls_until_completed(self):
         t = FakeTransport([
             {"data": {"id": "t1", "status": "pending"}},
@@ -728,6 +745,32 @@ class TestCLIGuards:
         sent = cli_mod._transport.requests[0]
         assert sent.path == "/orders"
         assert sent.json["shipping"] == "STANDARD"
+
+    def test_items_without_artwork_are_refused_before_any_request(self, tmp_path):
+        """--items reaches the API's placements invariant, and fails locally.
+
+        Before Task 14 this JSON was passed through unjudged and the API
+        returned the 400. It now fails in the core builder, which costs no API
+        call and names the offending index and variant — neither of which the
+        API's own message does. The transport capturing nothing is what
+        separates a local rejection from a round trip.
+        """
+        cli_mod = _fresh_cli()
+        cli_mod._transport = FakeTransport([{"data": {"id": 999}}])
+        result = CliRunner().invoke(cli_mod.cli, [
+            "--json", "--session", _session_path(tmp_path, "items.json"),
+            "orders", "create",
+            "--items", '[{"catalog_variant_id": 4012, "quantity": 1}]',
+            "--name", "J", "--address1", "1 St", "--city", "Berlin",
+            "--country-code", "DE", "--zip", "10115",
+        ], obj={})
+        assert result.exit_code != 0
+        error = json.loads(result.output)["error"]
+        assert "placements" in error
+        assert "4012" in error, f"Expected the offending variant named: {error!r}"
+        assert cli_mod._transport.requests == [], (
+            "Rejection must happen locally — no request may be sent"
+        )
 
     def test_dry_run_suppresses_session_write(self, tmp_path):
         cli_mod = _fresh_cli()

@@ -253,9 +253,11 @@ v1-style envelope, for 400 and 404 alike:
 Reading only `detail`/`title` collapsed every v2 error to "Unknown error", which
 masked the next three defects — they were invisible until this was fixed.
 
-`_extract_error_message` now tries every known shape regardless of version.
-Regression: `test_v2_error_reads_v1_style_envelope`,
-`test_v2_404_reads_v1_style_envelope`, `test_v2_error_never_degrades_to_unknown`.
+`printful_core.errors.extract_message` now tries every known shape regardless of
+version. Regression, in `src/printful_core/tests/test_errors.py`:
+`TestExtractMessage::test_live_envelope_wins`, `::test_data_string_only`,
+`::test_rfc9457_detail`, `::test_rfc9457_title_fallback`. The CLI-side
+equivalents were deleted with the CLI's HTTP stack in Task 14.
 
 **The same bug exists in the parent repo at `src/printful_mcp/client.py:141`.**
 Not fixed here — out of scope for this harness.
@@ -264,9 +266,14 @@ Not fixed here — out of scope for this harness.
 
 Returns 20 of 239 rows by default, and `US` is not in the first page
 alphabetically. The CLI reported that Printful does not ship to the United
-States. `list_countries` now walks every page. Regression:
-`TestCountriesPagination` (6 tests) plus a live assertion that the returned count
-equals `paging.total`.
+States. `list_countries` now walks every page, through
+`printful_core.pagination.collect_pages`. Regression:
+`TestCountriesPagination::test_every_page_is_requested` and
+`::test_us_present_after_pagination` here — both fail if the CLI is changed to a
+single `transport.send` — plus the page-walking mechanics in
+`src/printful_core/tests/test_pagination.py` (7 tests), which is also where the
+returned-count-equals-`paging.total` assertion now lives, and a live assertion
+that `US`, `GB`, `DE` and `CA` are all present.
 
 ### 3. Catalog order items require `placements`
 
@@ -277,20 +284,31 @@ exact command to fix it, and `summary()` exposes `items_without_design`.
 
 The asymmetry matters and is deliberately preserved: **shipping rates can be
 quoted without artwork**, so a draft is `priceable` before it is `complete`.
-Regression: 7 tests in `TestDraftOrder` plus live coverage of both paths.
+Task 14 established live that the asymmetry is narrower than it looks — *only*
+rates are exempt. `/v2/order-estimation-tasks` refuses a design-less catalog item
+with the same message `/v2/orders` gives.
+Regression: 7 tests in `TestDraftOrder`, plus live coverage of each side —
+`test_shipping_rates_for_us_destination` (quoted without artwork) and
+`test_estimation_rejects_an_item_with_no_artwork` (refused without artwork).
 
 ### 4. `/v2/shipping-rates` rejects an item without `source`
 
 `Property `/order_items/0/source` must be of type `string`, `null` provided`.
 `calculate_rates` now defaults `source` to `catalog` without mutating the
-caller's list. Regression: `test_rates_defaults_missing_source`,
-`test_rates_preserves_explicit_source`, `test_rates_does_not_mutate_caller_items`.
+caller's list. Regression, in `src/printful_core/tests/test_endpoints_shipping.py`:
+`test_rates_default_missing_source`, `test_rates_preserve_explicit_source`,
+`test_rates_do_not_mutate_caller_items`. The CLI-side equivalents were deleted in
+Task 14 when the payload construction moved into the core builder.
 
 ### 5. Shipping rate rows are keyed `shipping` / `shipping_method_name`
 
-Not `id` / `name`. `summarize_rates` produced a table of nulls for the two most
-important columns. Both spellings are now accepted, live first. Regression:
-`test_summarize_rates_reads_live_keys`, `test_summarize_rates_falls_back_to_id_name`.
+Not `id` / `name`. The rate summarizer produced a table of nulls for the two most
+important columns. Both spellings are now accepted, live first. Regression, in
+`src/printful_core/tests/test_format.py`: `TestRates::test_live_keys`,
+`::test_falls_back_to_id_and_name`, `::test_live_keys_win_when_both_present`. The
+CLI-side equivalents were deleted in Task 14 with `summarize_rates` itself; the
+CLI now pins only that `calculate_rates` returns the summarized shape, in
+`TestSummarizedReturns::test_rates`.
 
 ### Also: a test that was too weak to catch defect 1
 

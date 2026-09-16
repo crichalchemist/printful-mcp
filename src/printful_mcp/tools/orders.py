@@ -96,7 +96,26 @@ async def create_order(client: PrintfulClient, params: CreateOrderInput) -> str:
             order_data["recipient"]["phone"] = params.recipient_phone
         if params.external_id:
             order_data["external_id"] = params.external_id
-        
+
+        try:
+            items = json.loads(params.items_json)
+        except json.JSONDecodeError as e:
+            return f"Error: items_json must be valid JSON array ({e})."
+
+        if not isinstance(items, list) or not items:
+            return "Error: items_json must be a non-empty JSON array of order items."
+
+        for index, item in enumerate(items):
+            if item.get("source", "catalog") == "catalog" and not item.get("placements"):
+                return (
+                    f"Error: order_items[{index}] has no placements. Printful "
+                    "rejects a catalog item with no artwork. Add placements, e.g. "
+                    '[{"placement":"front","technique":"dtg","layers":'
+                    '[{"type":"file","url":"https://example.com/art.png"}]}]'
+                )
+
+        order_data["order_items"] = items
+
         data = await client.post("/orders", json_data=order_data)
         
         if params.format == "json":

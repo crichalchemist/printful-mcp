@@ -68,6 +68,17 @@ class CreateOrderInput(BaseModel):
     recipient_email: Optional[str] = Field(default=None, description="Recipient email")
     recipient_phone: Optional[str] = Field(default=None, description="Recipient phone")
     external_id: Optional[str] = Field(default=None, description="Your order ID for reference")
+    items_json: str = Field(
+        ...,
+        description=(
+            "JSON array of order items. Each catalog item needs source, "
+            "catalog_variant_id, quantity, and placements (Printful rejects an "
+            "item with no artwork). Example: "
+            '[{"source":"catalog","catalog_variant_id":4012,"quantity":1,'
+            '"placements":[{"placement":"front","technique":"dtg",'
+            '"layers":[{"type":"file","url":"https://example.com/art.png"}]}]}]'
+        ),
+    )
     format: Literal["markdown", "json"] = Field(default="markdown", description="Output format")
 
 

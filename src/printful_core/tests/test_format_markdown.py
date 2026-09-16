@@ -688,6 +688,303 @@ def test_a_mockup_style_row_carries_the_id_a_caller_requests_by():
     assert "**Technique:** dtg" in out
 
 
+def test_an_added_file_still_processing_reports_status_without_stale_dimensions():
+    """`printful_add_file` returns immediately; the file may still be
+    processing. A caller must see 'waiting' and not a dimensions/size block
+    that implies the upload already finished.
+    """
+    out = markdown.file_added({"id": 601, "status": "waiting", "filename": "logo.png"})
+    assert "**Status:** waiting" in out
+    assert "⏳ File is being processed. Check status with printful_get_file." in out
+    assert "**File ID:** 601" in out
+    assert "**Filename:** logo.png" in out
+    assert "**Dimensions:**" not in out
+
+
+def test_an_added_file_that_finished_processing_carries_the_dimensions_and_preview():
+    """Once `status` is 'ok', the dimensions/dpi/size/preview_url block is
+    the only place a caller learns whether the upload the API accepted is
+    actually usable for printing -- a renamed key here degrades silently to
+    'None' rather than raising.
+    """
+    out = markdown.file_added(
+        {
+            "id": 602,
+            "status": "ok",
+            "filename": "design.png",
+            "url": "https://example.com/design.png",
+            "width": 4500,
+            "height": 5400,
+            "dpi": 300,
+            "size": 204800,
+            "preview_url": "https://example.com/preview.png",
+        }
+    )
+    assert "**Filename:** design.png" in out
+    assert "**File ID:** 602" in out
+    assert "**Status:** ok" in out
+    assert "**Original URL:** https://example.com/design.png" in out
+    assert "**Dimensions:** 4500x5400px" in out
+    assert "**DPI:** 300" in out
+    assert "**Size:** 204800 bytes" in out
+    assert "**Preview:** https://example.com/preview.png" in out
+
+
+def test_a_finished_file_detail_carries_the_hash_a_caller_verifies_integrity_with():
+    """`printful_get_file` is the only tool that surfaces `hash` -- a caller
+    comparing a re-uploaded file against the library copy has no other way
+    to tell them apart, and it sits alongside dimensions/size/urls that a
+    print job also depends on.
+    """
+    out = markdown.file_detail(
+        {
+            "id": 701,
+            "status": "ok",
+            "filename": "logo.svg",
+            "mime_type": "image/svg+xml",
+            "created": "2026-01-05",
+            "width": 800,
+            "height": 600,
+            "dpi": 150,
+            "size": 20480,
+            "hash": "abc123hash",
+            "url": "https://example.com/logo.svg",
+            "thumbnail_url": "https://example.com/logo-thumb.svg",
+            "preview_url": "https://example.com/logo-preview.svg",
+        }
+    )
+    assert "**Hash:** abc123hash" in out
+    assert "# File 701" in out
+    assert "**Status:** ok" in out
+    assert "**Filename:** logo.svg" in out
+    assert "**MIME Type:** image/svg+xml" in out
+    assert "**Created:** 2026-01-05" in out
+    assert "**Dimensions:** 800x600px" in out
+    assert "**DPI:** 150" in out
+    assert "**Size:** 20480 bytes" in out
+    assert "**Original:** https://example.com/logo.svg" in out
+    assert "**Thumbnail:** https://example.com/logo-thumb.svg" in out
+    assert "**Preview:** https://example.com/logo-preview.svg" in out
+
+
+def test_a_file_still_processing_says_so_instead_of_a_blank_detail_block():
+    """A caller polling `printful_get_file` before it finishes must see
+    'still being processed', not a Details/URLs block with every value
+    rendering None.
+    """
+    out = markdown.file_detail({"id": 702, "status": "waiting", "filename": "logo.svg"})
+    assert "**Status:** waiting" in out
+    assert "⏳ File is still being processed." in out
+    assert "## File Details" not in out
+
+
+def test_a_failed_file_reports_the_failure_not_a_silent_n_a_block():
+    """A caller cannot retry a file upload sensibly if 'failed' renders
+    indistinguishably from 'waiting' or from a successful file with blank
+    fields -- this is the only branch that says the file will never be
+    usable.
+    """
+    out = markdown.file_detail({"id": 703, "status": "failed", "filename": "logo.svg"})
+    assert "**Status:** failed" in out
+    assert "❌ File processing failed. The file may be invalid or inaccessible." in out
+    assert "## File Details" not in out
+
+
+def test_a_store_row_carries_the_id_and_type_a_caller_switches_context_by():
+    """`printful_get_store_stats` and the sync-product tools all take a
+    store id that only this renderer supplies -- a renamed `id` or `type`
+    leaves a caller unable to tell two connected stores apart.
+    """
+    out = markdown.stores(
+        {
+            "data": [
+                {"id": 501, "name": "My Threads Shop", "type": "manual"},
+                {"id": 502, "name": "Etsy Connect", "type": "etsy"},
+            ]
+        }
+    )
+    assert "**ID:** 501" in out
+    assert "## My Threads Shop" in out
+    assert "**Type:** manual" in out
+    assert "**ID:** 502" in out
+    assert "## Etsy Connect" in out
+    assert "**Type:** etsy" in out
+    assert "# Stores (2 total)" in out
+
+
+def test_store_statistics_header_carries_the_requested_window_not_the_body():
+    """`store_statistics` takes `date_from`/`date_to` as arguments because
+    the response body does not carry the range back -- the header must
+    print what was *asked for*, and each of the four metric sections needs
+    its own value tied to its own percentage change, not a neighbor's.
+    """
+    out = markdown.store_statistics(
+        {
+            "data": {
+                "store_id": 9001,
+                "currency": "GBP",
+                "profit": {"value": 120.5, "relative_difference": "+12%"},
+                "total_paid_orders": {"value": 34, "relative_difference": "-3%"},
+                "printful_costs": {"value": 80.25, "relative_difference": "+5%"},
+                "average_fulfillment_time": {"value": 2.4, "relative_difference": "-0.5%"},
+            }
+        },
+        date_from="2026-08-01",
+        date_to="2026-08-31",
+    )
+    assert "# Store Statistics (2026-08-01 to 2026-08-31)" in out
+    assert "**Store ID:** 9001" in out
+    assert "**Currency:** GBP" in out
+    assert "**Value:** 120.5 GBP" in out
+    assert "**Change:** +12%" in out
+    assert "**Count:** 34" in out
+    assert "**Change:** -3%" in out
+    assert "**Value:** 80.25 GBP" in out
+    assert "**Change:** +5%" in out
+    assert "**Days:** 2.4" in out
+    assert "**Change:** -0.5%" in out
+
+
+def test_a_template_row_shows_the_product_id_not_a_v2_field_name():
+    """This renderer shipped reading `catalog_product_id`; the API sends
+    `product_id`, so every row printed 'N/A' and nothing failed. The v1
+    body also arrives as `items`, not the v2 `data` envelope -- reading
+    `data` renders 'Showing 0 templates' for a store that has templates.
+
+    `paging.total` is deliberately 5 against a single row: `paging.get`
+    falls back to `len(rows)` (1) when the key is missing, and a fixture
+    where `total` already equals `len(rows)` cannot tell a live `total`
+    read from that silent fallback -- a mutation sweep against the first
+    draft of this fixture (`total: 1`) proved exactly that (both `paging`
+    and `total` survived the whole-file sweep untouched).
+    """
+    out = markdown.store_templates(
+        {
+            "items": [
+                {"id": 77, "title": "Summer Tee", "product_id": 71, "created_at": "2026-01-01"}
+            ],
+            "paging": {"total": 5},
+        }
+    )
+    assert "5 total" in out
+    assert "71" in out
+    assert "Summer Tee" in out
+    assert "77" in out
+    assert "2026-01-01" in out
+    assert "Showing 1 templates" in out
+
+
+def test_a_bare_list_of_templates_still_renders():
+    """v1 hands some collections back as the list itself. `.get` on a list
+    raises AttributeError, which is not a PrintfulError and escapes the tool
+    as a traceback where an MCP client expects a string.
+    """
+    out = markdown.store_templates(
+        [{"id": 77, "title": "Summer Tee", "product_id": 71, "created_at": "2026-01-01"}]
+    )
+    assert "Summer Tee" in out
+    assert "71" in out
+    assert "77" in out
+
+
+def test_store_templates_with_a_null_v1_result_renders_instead_of_raising():
+    """`{"code": 200, "result": null}` unwraps to `None`. `isinstance(None,
+    list)` is False, so the un-guarded renderer fell into the `else` branch
+    and called `.get` on `None`, raising `AttributeError` where an MCP
+    client expects a string.
+    """
+    out = markdown.store_templates(None)
+    assert isinstance(out, str)
+    assert "# Product Templates (0 total)" in out
+    assert "Showing 0 templates" in out
+
+
+def test_a_sync_products_page_reports_shown_count_and_variant_totals():
+    """`sync_products` is v1-only and its envelope key is `items`, not the
+    v2 `data` this file's other list renderers read -- reading the wrong
+    one renders '0 shown' for a store that has sync products.
+    """
+    out = markdown.sync_products(
+        {
+            "items": [
+                {
+                    "id": 8001,
+                    "name": "Custom Mug",
+                    "external_id": "ext-mug-1",
+                    "sync_variants": [{"id": 1}, {"id": 2}, {"id": 3}],
+                }
+            ]
+        }
+    )
+    assert "**Sync Product ID:** 8001" in out
+    assert "## Custom Mug" in out
+    assert "**External ID:** ext-mug-1" in out
+    assert "**Sync Variants:** 3" in out
+    assert "# Sync Products (1 shown)" in out
+
+
+def test_a_bare_list_of_sync_products_still_renders():
+    """The same bare-list shape `store_templates` documents can arrive
+    here too; reading only `.get('items', [])` on a bare list raises
+    AttributeError instead of rendering.
+    """
+    out = markdown.sync_products(
+        [{"id": 8002, "name": "Custom Cap", "external_id": "ext-cap-1", "sync_variants": []}]
+    )
+    assert "**Sync Product ID:** 8002" in out
+    assert "## Custom Cap" in out
+    assert "**External ID:** ext-cap-1" in out
+    assert "**Sync Variants:** 0" in out
+
+
+def test_sync_products_with_a_null_v1_result_renders_instead_of_raising():
+    """Symmetric with `store_templates`: a `result: null` v1 body must
+    render '(0 shown)' rather than raise AttributeError on `None.get`.
+    """
+    out = markdown.sync_products(None)
+    assert isinstance(out, str)
+    assert "# Sync Products (0 shown)" in out
+
+
+def test_a_sync_product_detail_carries_variant_pricing_and_currency():
+    """`sync_product` takes the bare body, no envelope -- `sync_product`
+    and `sync_variants` are its own top-level keys. A caller placing an
+    order from `printful_get_sync_product` needs `variant_id` (the catalog
+    variant to order) and `retail_price`/`currency` together, or they quote
+    a price with no currency or order the wrong SKU.
+    """
+    out = markdown.sync_product(
+        {
+            "sync_product": {
+                "id": 9001,
+                "name": "Custom Hoodie",
+                "external_id": "ext-hoodie-1",
+                "thumbnail_url": "https://example.com/hoodie-thumb.png",
+            },
+            "sync_variants": [
+                {
+                    "id": 501,
+                    "name": "Hoodie / M / Black",
+                    "external_id": "ext-var-1",
+                    "variant_id": 4099,
+                    "retail_price": "29.99",
+                    "currency": "USD",
+                }
+            ],
+        }
+    )
+    assert "**Variant ID:** 4099" in out
+    assert "**Retail Price:** 29.99 USD" in out
+    assert "# Custom Hoodie" in out
+    assert "**Sync Product ID:** 9001" in out
+    assert "**External ID:** ext-hoodie-1" in out
+    assert "**Thumbnail:** https://example.com/hoodie-thumb.png" in out
+    assert "## Sync Variants (1)" in out
+    assert "### Variant 501" in out
+    assert "**Name:** Hoodie / M / Black" in out
+    assert "**External ID:** ext-var-1" in out
+
+
 def test_a_mockup_template_row_carries_the_print_area_a_design_must_fit():
     """A design that exceeds `print_area_width`/`height` gets rejected or
     cropped at generation time -- this is the only place those two numbers

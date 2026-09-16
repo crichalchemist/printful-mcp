@@ -666,7 +666,9 @@ def store_templates(data: Any) -> str:
     printful_cli/core/stores.py and finds two shapes: the documented
     {"items": [...], "paging": {...}} and a bare list. Both render here.
     """
-    if isinstance(data, list):
+    if not data:
+        rows, paging = [], {}
+    elif isinstance(data, list):
         rows, paging = data, {}
     else:
         rows = data.get("items", [])
@@ -697,7 +699,12 @@ def sync_products(data: Any) -> str:
     Reading only the list rendered the envelope as "0 shown" — a wrong answer
     with no error, which is the v1 trap `CLAUDE.md` warns about.
     """
-    products = data if isinstance(data, list) else data.get("items", [])
+    if not data:
+        products = []
+    elif isinstance(data, list):
+        products = data
+    else:
+        products = data.get("items", [])
 
     lines = [
         f"# Sync Products ({len(products)} shown)",

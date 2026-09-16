@@ -232,8 +232,8 @@ async def create_estimation_task(
             return json.dumps(data, indent=2)
         body = polling.task_body(data)
         return (
-            f"Estimation task created.\n\nTask ID: {body.get('id')}\n"
-            f"Status: {body.get('status')}\n\n"
+            f"Estimation task created.\n\nTask ID: {body.get('id', 'unknown')}\n"
+            f"Status: {body.get('status', 'unknown')}\n\n"
             "Read the result with printful_get_estimation_task."
         )
     except ValueError as e:

@@ -255,7 +255,47 @@ async def test_a_failed_estimate_reports_why(transport):
     assert "No shipping to that country" in out
 
 
-async def test_estimation_does_not_require_artwork(transport):
+async def test_a_partial_estimation_task_record_reads_as_unknown_not_none(transport):
+    """A task record missing a key must not tell the caller its ID is "None".
+
+    The same defect class as the `body['id']` reads in tools/mockups.py, but the
+    non-raising half of it: `.get()` with no default cannot raise, so nothing
+    escapes the tool's `try` -- it simply renders a Python `None` into prose and
+    hands the caller a task ID they cannot use. `mockups.py` degrades to
+    'unknown'; this does too, so the two surfaces answer a partial record the
+    same way.
+
+    The `try` mirrors the mockups test and the two cases above it: it is the
+    file's idiom for "this must return, never raise", and it would catch a
+    future rewrite of `.get` back into a subscript.
+    """
+    params = CreateEstimationTaskInput(
+        recipient_country_code="US",
+        items_json=json.dumps([{"source": "sync_product", "sync_variant_id": 5, "quantity": 1}]),
+    )
+
+    transport._responses.append({"data": {"status": "pending"}})
+    try:
+        out = await orders.create_estimation_task(transport, params)
+    except Exception as exc:  # noqa: BLE001 - must catch any escape to report it via pytest.fail
+        pytest.fail(
+            f"create_estimation_task raised {type(exc).__name__}: {exc} on a record with no id"
+        )
+    assert "Task ID: unknown" in out
+    assert "Status: pending" in out
+
+    transport._responses.append({"data": {"id": "e9"}})
+    try:
+        out = await orders.create_estimation_task(transport, params)
+    except Exception as exc:  # noqa: BLE001 - must catch any escape to report it via pytest.fail
+        pytest.fail(
+            f"create_estimation_task raised {type(exc).__name__}: {exc} on a record with no status"
+        )
+    assert "Task ID: e9" in out
+    assert "Status: unknown" in out
+
+
+async def test_an_estimate_with_no_artwork_is_sent_not_refused_locally(transport):
     """The core builder deliberately does not guard placements for an estimate.
 
     The live API *does* reject a catalog item with no placements here, with the

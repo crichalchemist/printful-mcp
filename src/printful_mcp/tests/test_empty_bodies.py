@@ -39,7 +39,7 @@ NOT_A_RENDERED_DOCUMENT = {
     "printful_create_mockup_task": "{}",
     "printful_get_mockup_task": "No task found with ID 1",
     "printful_create_estimation_task": (
-        "Estimation task created.\n\nTask ID: None\nStatus: None\n\n"
+        "Estimation task created.\n\nTask ID: unknown\nStatus: unknown\n\n"
         "Read the result with printful_get_estimation_task."
     ),
 }
@@ -109,7 +109,11 @@ async def test_an_empty_success_body_is_reported_not_raised(tool_name):
             f"{tool_name} is pinned as a tool that renders no document for an "
             f"empty body, but it now returns:\n{result!r}\nIf it has started "
             "rendering one, delete its entry so the general assertion below "
-            "covers it; if the wording merely changed, update the pin."
+            "covers it; if the wording merely changed, update the pin. A pinned "
+            "string can also embed a value from the sample input rather than "
+            "from the tool -- the ID in get_mockup_task's message is "
+            "toolsamples._BY_TYPE[str] -- so check whether _BY_TYPE or _SAMPLES "
+            "changed before looking at the tool at all."
         )
     else:
         # One tuple call rather than three -- PIE810. Same predicate: a heading

@@ -14,6 +14,17 @@ contain no branching logic of their own.
 What a driver will not say is what the caller should do next. Recovery advice
 names a command, and the CLI's commands are not the MCP server's, so a caller
 that has one passes it in.
+
+One invariant is narrower here than elsewhere in the core, and the narrowing is
+deliberate. The core still performs no I/O: nothing in this module touches the
+network, and every request goes out through the `send` the caller supplies. But
+a poll is a loop against a deadline, so the four drivers **block on the clock** —
+`time.sleep` in the synchronous pair, `asyncio.sleep` in the asynchronous one.
+
+So the purity here is split, and which half a function is in matters to anyone
+testing it: `task_body` and `classify_task` are pure and need no transport, no
+clock and no event loop, while the drivers need all three. A caller that wants
+the decisions without the waiting calls the pure pair and writes its own loop.
 """
 from __future__ import annotations
 

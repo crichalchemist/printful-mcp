@@ -322,3 +322,58 @@ def estimate(body: Dict[str, Any], status: str) -> str:
         f"",
     ]
     return "\n".join(lines)
+
+
+def rates(data: Dict[str, Any]) -> str:
+    """Available shipping options."""
+    rows = data.get('data', [])
+    lines = [f"# Shipping Rates", f"", f"Found {len(rows)} shipping options", f""]
+    for row in rows:
+        delivery = f"{row['min_delivery_days']}-{row['max_delivery_days']} days"
+        lines.extend([
+            f"## {row['shipping_method_name']}",
+            f"- **Rate:** {row['rate']} {row['currency']}",
+            f"- **Delivery:** {delivery} ({row['min_delivery_date']} to "
+            f"{row['max_delivery_date']})",
+            f"",
+        ])
+        if row.get('shipments'):
+            lines.append("### Shipments")
+            for shipment in row['shipments']:
+                customs = "Yes" if shipment.get('customs_fees_possible') else "No"
+                lines.append(
+                    f"- From {shipment['departure_country']} - "
+                    f"Customs fees possible: {customs}")
+            lines.append("")
+    return "\n".join(lines)
+
+
+def countries(data: Dict[str, Any]) -> str:
+    """Every country Printful ships to."""
+    rows = data.get('data', [])
+    lines = [f"# Available Countries ({len(rows)} total)", f""]
+    for row in rows:
+        lines.append(f"## {row['name']} ({row['code']})")
+        if row.get('states'):
+            lines.append(f"**States:** {len(row['states'])} available")
+            for state in row['states'][:3]:
+                lines.append(f"  - {state['name']} ({state['code']})")
+            if len(row['states']) > 3:
+                lines.append(f"  - _(and {len(row['states']) - 3} more)_")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def tax(data: Dict[str, Any]) -> str:
+    """A tax rate for one destination."""
+    body = data if not isinstance(data.get('data'), dict) else data['data']
+    required = body.get('required')
+    lines = [
+        f"# Tax Rate",
+        f"",
+        f"**Tax required:** {'yes' if required else 'no'}",
+        f"**Rate:** {body.get('rate', 'N/A')}",
+        f"**Shipping taxable:** {'yes' if body.get('shipping_taxable') else 'no'}",
+        f"",
+    ]
+    return "\n".join(lines)

@@ -177,6 +177,16 @@ class CalculateShippingInput(BaseModel):
     format: Literal["markdown", "json"] = Field(default="markdown", description="Output format")
 
 
+class CalculateTaxInput(BaseModel):
+    """Input for printful_calculate_tax."""
+    country_code: str = Field(description="Destination country code, e.g. US")
+    state_code: Optional[str] = Field(default=None, description="State code, e.g. CA")
+    city: Optional[str] = Field(default=None, description="Destination city")
+    zip_code: Optional[str] = Field(default=None, description="Destination ZIP/postal code")
+    format: Literal["markdown", "json"] = Field(
+        default="markdown", description="Response format")
+
+
 # Mockup Models
 class CreateMockupTaskInput(BaseModel):
     """Input for creating a mockup generation task."""

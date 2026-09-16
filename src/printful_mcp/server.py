@@ -29,6 +29,7 @@ from .models.inputs import (
     CreateEstimationTaskInput,
     GetEstimationTaskInput,
     CalculateShippingInput,
+    CalculateTaxInput,
     CreateMockupTaskInput,
     GetMockupTaskInput,
     AddFileInput,
@@ -427,7 +428,7 @@ async def printful_calculate_shipping(params: CalculateShippingInput) -> str:
     Returns available shipping methods, costs, and estimated delivery times
     based on recipient location and order items.
     """
-    return await shipping.calculate_shipping_rates(get_client(), params)
+    return await shipping.calculate_shipping_rates(get_transport(), params)
 
 
 @mcp.tool(
@@ -443,11 +444,28 @@ async def printful_calculate_shipping(params: CalculateShippingInput) -> str:
 async def printful_list_countries() -> str:
     """
     List all countries where Printful ships.
-    
+
     Returns country codes and state codes needed for creating orders.
     Essential for address validation.
     """
-    return await shipping.list_countries(get_client())
+    return await shipping.list_countries(get_transport())
+
+
+@mcp.tool(
+    name="printful_calculate_tax",
+    annotations={
+        "title": "Calculate Tax Rate",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    }
+)
+async def printful_calculate_tax(params: CalculateTaxInput) -> str:
+    """
+    Get the tax rate for a destination. Uses API v1; v2 has no tax endpoint.
+    """
+    return await shipping.calculate_tax(get_transport(), params)
 
 
 # ========== MOCKUP TOOLS ==========

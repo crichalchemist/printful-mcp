@@ -81,7 +81,7 @@ async def test_fake_transport_raises_a_queued_exception_instance():
     """A queued exception instance is raised, not returned as a response body.
 
     This is how downstream tests simulate an API error (e.g. a 404 or a
-    validation failure) to assert a tool's `except PrintfulAPIError` path. If
+    validation failure) to assert a tool's `except PrintfulError` path. If
     this stops raising, every such test that expects `pytest.raises(...)`
     fails, and the tool's error-formatting code goes untested.
     """

@@ -42,7 +42,6 @@ dependencies = [
     "python-dotenv>=1.0.0",
     # cli-anything-printful (src/cli_anything/printful)
     "click>=8.0.0",
-    "requests>=2.28.0",
     "prompt_toolkit>=3.0.0",
 ]
 
@@ -75,6 +74,7 @@ addopts = "-m 'not live'"
 markers = [
     "live: hits the real Printful API; requires PRINTFUL_API_KEY",
 ]
+asyncio_mode = "auto"
 
 [tool.setuptools.packages.find]
 where = ["src"]

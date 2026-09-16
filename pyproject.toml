@@ -33,7 +33,10 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-    "mcp>=0.9.0",
+    # Upper bound is required, not cautious: mcp 2.x renamed FastMCP to
+    # MCPServer, so server.py fails at import against 2.x. Without this pin a
+    # fresh `pip install -e .` produces a server that cannot start.
+    "mcp>=0.9.0,<2",
     "httpx>=0.27.0",
     "pydantic>=2.0.0",
     "python-dotenv>=1.0.0",

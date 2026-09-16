@@ -257,7 +257,7 @@ def auto_save_on_exit(ctx, result, use_json, dry_run, api_key, store_id, session
     if sess._modified:
         try:
             sess.save_session()
-        except OSError as e:  # pragma: no cover - disk failure path
+        except Exception as e:  # noqa: BLE001 - best-effort exit save: report, never traceback; pragma: no cover
             click.echo(f"Warning: Auto-save failed: {e}", err=True)
 
 
@@ -1357,7 +1357,7 @@ def repl(ctx):
         try:
             sess.save_session()
             ui.success("Session saved.")
-        except OSError as e:
+        except Exception as e:  # noqa: BLE001 - best-effort exit save: report, never traceback
             ui.error(f"Could not save session: {e}")
     _repl_mode = False
 

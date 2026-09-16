@@ -201,7 +201,7 @@ backend E2E.
 
 ```bash
 export PRINTFUL_API_KEY=...            # supplied by the operator
-export PRINTFUL_STORE_ID=1135966       # Fatherhood University
+export PRINTFUL_STORE_ID=23456789      # Example Store 2
 PATH="$PWD/.venv/bin:$PATH" PRINTFUL_FORCE_INSTALLED=1 \
   python -m pytest src/printful_cli/tests/ -v -s
 ```
@@ -228,7 +228,7 @@ Live artifacts printed during the run:
 ```
   Countries: 239 of 239
   Products: [1, 2, 3]
-  Stores: [(905397, 'Personal orders'), (1135966, 'Fatherhood University'), (6751340, 'Square store')]
+  Stores: [(12345678, 'Example Store'), (23456789, 'Example Store 2'), (34567890, 'Example Store 3')]
   404 surfaced as: Product 99999999 does not exist or is inactive.
   Rates: [('Flat Rate (Estimated delivery: Sep 23–25) ', '4.95', 'USD')]
   Draft order created: 176657491
@@ -332,6 +332,6 @@ the four v1/scope-dependent endpoints above and for mockups.
 
 ## Test account note
 
-The live write path ran against store **1135966 (Fatherhood University)**, chosen
+The live write path ran against store **23456789 (Example Store 2)**, chosen
 by the operator. Each run creates exactly one draft order and deletes it
 (`DELETE /v2/orders/{id}` → 204). Drafts are never charged.

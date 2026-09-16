@@ -65,13 +65,13 @@ Pick one interactively:
 ```bash
 printful store use
 #   #  ID        Name                    Type
-#   1  905397    Personal orders         native
-#   2  1135966   Fatherhood University   storenvy
-#   3  6751340   Square store            square
+#   1  12345678  Example Store           native
+#   2  23456789  Example Store 2         storenvy
+#   3  34567890  Example Store 3         square
 # Select a store [1-3]:
 
 # Or set it directly and make it the default
-printful store use 1135966 --save
+printful store use 23456789 --save
 ```
 
 With `--json`, or when stdin is not a terminal, the picker does not prompt — it

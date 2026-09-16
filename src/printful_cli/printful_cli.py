@@ -257,7 +257,7 @@ def auto_save_on_exit(ctx, result, use_json, dry_run, api_key, store_id, session
     if sess._modified:
         try:
             sess.save_session()
-        except Exception as e:  # noqa: BLE001 - best-effort exit save: report, never traceback; pragma: no cover
+        except Exception as e:  # noqa: BLE001 - best-effort exit save: report, never traceback  # pragma: no cover
             click.echo(f"Warning: Auto-save failed: {e}", err=True)
 
 
@@ -1350,7 +1350,7 @@ def repl(ctx):
             pass
         except click.ClickException as e:
             ui.error(e.format_message())
-        except Exception as e:  # noqa: BLE001 - REPL must survive any user command error; pragma: no cover
+        except Exception as e:  # noqa: BLE001 - REPL must survive any user command error  # pragma: no cover
             ui.error(str(e))
 
     if sess._modified:

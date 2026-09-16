@@ -175,9 +175,9 @@ async def printful_get_product_availability(params: GetProductAvailabilityInput)
 async def printful_create_order(params: CreateOrderInput) -> str:
     """
     Create a new order in draft status.
-    
-    Creates an empty order with recipient info. Add items separately, then
-    confirm to start fulfillment. Draft orders are not charged.
+
+    Creates an order in draft status with its items. Drafts are not charged
+    until confirmed. Each catalog item requires placements (artwork).
     """
     return await orders.create_order(get_client(), params)
 

@@ -19,8 +19,7 @@ from ..models.inputs import (
 )
 
 
-async def list_catalog_products(transport: AsyncTransport,
-                                params: ListCatalogProductsInput) -> str:
+async def list_catalog_products(transport: AsyncTransport, params: ListCatalogProductsInput) -> str:
     """
     List catalog products with optional filters.
 
@@ -60,16 +59,14 @@ async def get_product(transport: AsyncTransport, params: GetProductInput) -> str
         return f"Error: {e.message}"
 
 
-async def get_product_variants(transport: AsyncTransport,
-                               params: GetProductVariantsInput) -> str:
+async def get_product_variants(transport: AsyncTransport, params: GetProductVariantsInput) -> str:
     """
     Get all variants (size/color combinations) for a catalog product.
 
     Returns variant IDs, names, sizes, colors, and images needed for ordering.
     """
     try:
-        request = catalog.list_variants(
-            params.product_id, limit=params.limit, offset=params.offset)
+        request = catalog.list_variants(params.product_id, limit=params.limit, offset=params.offset)
         data = await transport.send(request)
         if params.format == "json":
             return json.dumps(data, indent=2)
@@ -78,8 +75,7 @@ async def get_product_variants(transport: AsyncTransport,
         return f"Error: {e.message}"
 
 
-async def get_variant_prices(transport: AsyncTransport,
-                             params: GetVariantPricesInput) -> str:
+async def get_variant_prices(transport: AsyncTransport, params: GetVariantPricesInput) -> str:
     """
     Get pricing information for a specific catalog variant.
 
@@ -95,8 +91,9 @@ async def get_variant_prices(transport: AsyncTransport,
         return f"Error: {e.message}"
 
 
-async def get_product_availability(transport: AsyncTransport,
-                                   params: GetProductAvailabilityInput) -> str:
+async def get_product_availability(
+    transport: AsyncTransport, params: GetProductAvailabilityInput
+) -> str:
     """
     Check stock availability for a catalog product.
 

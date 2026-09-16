@@ -9,6 +9,7 @@ formatters now live in printful_core and are tested in src/printful_core/tests.
 What is left here is what the CLI itself owns: session state, polling loops,
 result shaping for the command layer, and the --yes guards.
 """
+
 from __future__ import annotations
 
 import json
@@ -19,9 +20,6 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from printful_core import auth as auth_mod
-from printful_core.auth import CONFIG_FILE as CORE_CONFIG_FILE
-from printful_core.errors import PrintfulError
 from printful_cli.core import catalog as catalog_mod
 from printful_cli.core import files as files_mod
 from printful_cli.core import mockups as mockups_mod
@@ -34,11 +32,14 @@ from printful_cli.core.session import (
     PrintfulSession,
     _locked_save_json,
 )
-
+from printful_core import auth as auth_mod
+from printful_core.auth import CONFIG_FILE as CORE_CONFIG_FILE
+from printful_core.errors import PrintfulError
 
 # --------------------------------------------------------------------------
 # Fake transport
 # --------------------------------------------------------------------------
+
 
 class FakeTransport:
     """Records the Requests it is handed and replays queued response bodies.
@@ -74,6 +75,7 @@ def isolate_env(monkeypatch, tmp_path):
 # DraftOrder
 # --------------------------------------------------------------------------
 
+
 class TestDraftOrder:
     def test_set_recipient_stores_known_fields(self):
         d = DraftOrder()
@@ -104,8 +106,9 @@ class TestDraftOrder:
 
     def test_add_item_with_image_nests_placement(self):
         d = DraftOrder()
-        item = d.add_item(4012, 1, placement="back", image_url="http://x/a.png",
-                          technique="embroidery")
+        item = d.add_item(
+            4012, 1, placement="back", image_url="http://x/a.png", technique="embroidery"
+        )
         placement = item["placements"][0]
         assert placement["placement"] == "back"
         assert placement["technique"] == "embroidery"
@@ -143,23 +146,20 @@ class TestDraftOrder:
 
     def test_state_code_required_for_us(self):
         d = DraftOrder()
-        d.set_recipient(name="J", address1="1 St", city="Austin",
-                        country_code="US", zip="78701")
+        d.set_recipient(name="J", address1="1 St", city="Austin", country_code="US", zip="78701")
         d.add_item(1, 1)
         assert "recipient.state_code" in d.missing_fields()
 
     @pytest.mark.parametrize("country", ["US", "CA", "AU"])
     def test_state_code_required_for_each_gated_country(self, country):
         d = DraftOrder()
-        d.set_recipient(name="J", address1="1 St", city="X",
-                        country_code=country, zip="1")
+        d.set_recipient(name="J", address1="1 St", city="X", country_code=country, zip="1")
         d.add_item(1, 1)
         assert "recipient.state_code" in d.missing_fields()
 
     def test_state_code_not_required_elsewhere(self):
         d = DraftOrder()
-        d.set_recipient(name="J", address1="1 St", city="Berlin",
-                        country_code="DE", zip="10115")
+        d.set_recipient(name="J", address1="1 St", city="Berlin", country_code="DE", zip="10115")
         d.add_item(1, 1, image_url="http://x/a.png")
         assert d.missing_fields() == []
         assert d.is_complete()
@@ -170,8 +170,7 @@ class TestDraftOrder:
 
     def test_to_api_payload_shape(self):
         d = DraftOrder()
-        d.set_recipient(name="J", address1="1 St", city="Berlin",
-                        country_code="DE", zip="10115")
+        d.set_recipient(name="J", address1="1 St", city="Berlin", country_code="DE", zip="10115")
         d.add_item(4012, 2, image_url="http://x/a.png")
         payload = d.to_api_payload()
         assert payload["recipient"]["name"] == "J"
@@ -184,8 +183,7 @@ class TestDraftOrder:
 
     def test_item_without_design_blocks_submission(self):
         d = DraftOrder()
-        d.set_recipient(name="J", address1="1 St", city="Berlin",
-                        country_code="DE", zip="10115")
+        d.set_recipient(name="J", address1="1 St", city="Berlin", country_code="DE", zip="10115")
         d.add_item(4012, 1)
         missing = d.missing_fields()
         assert any("placements" in m for m in missing)
@@ -200,8 +198,7 @@ class TestDraftOrder:
 
     def test_item_with_design_is_complete(self):
         d = DraftOrder()
-        d.set_recipient(name="J", address1="1 St", city="Berlin",
-                        country_code="DE", zip="10115")
+        d.set_recipient(name="J", address1="1 St", city="Berlin", country_code="DE", zip="10115")
         d.add_item(4012, 1, image_url="http://x/a.png")
         assert d.missing_fields() == []
         assert d.is_complete()
@@ -227,16 +224,14 @@ class TestDraftOrder:
 
     def test_non_catalog_source_exempt_from_placements(self):
         d = DraftOrder()
-        d.set_recipient(name="J", address1="1 St", city="Berlin",
-                        country_code="DE", zip="10115")
+        d.set_recipient(name="J", address1="1 St", city="Berlin", country_code="DE", zip="10115")
         d.add_item(4012, 1)
         d.items[0]["source"] = "sync_product"
         assert d.missing_fields() == []
 
     def test_to_api_payload_includes_optional_fields(self):
         d = DraftOrder()
-        d.set_recipient(name="J", address1="1 St", city="Berlin",
-                        country_code="DE", zip="10115")
+        d.set_recipient(name="J", address1="1 St", city="Berlin", country_code="DE", zip="10115")
         d.add_item(1, 1, image_url="http://x/a.png")
         d.external_id = "ext-1"
         d.shipping = "STANDARD"
@@ -264,6 +259,7 @@ class TestDraftOrder:
 # --------------------------------------------------------------------------
 # PrintfulSession
 # --------------------------------------------------------------------------
+
 
 class TestPrintfulSession:
     def test_round_trip(self, tmp_path):
@@ -320,7 +316,8 @@ class TestPrintfulSession:
     def test_locked_save_creates_parent_dirs(self, tmp_path):
         target = str(tmp_path / "deep" / "nested" / "s.json")
         _locked_save_json(target, {"a": 1}, indent=2)
-        assert json.loads(open(target).read()) == {"a": 1}
+        with open(target) as f:
+            assert json.loads(f.read()) == {"a": 1}
 
     def test_status_reports_session_file(self, tmp_path):
         path = str(tmp_path / "s.json")
@@ -333,16 +330,15 @@ class TestPrintfulSession:
         the core's config directory itself moved somewhere else.
         """
         assert Path(DEFAULT_SESSION_FILE).parent == CORE_CONFIG_FILE.parent
-        assert Path(DEFAULT_SESSION_FILE) == (
-            Path.home() / ".config" / "printful" / "session.json"
-        )
+        assert Path(DEFAULT_SESSION_FILE) == (Path.home() / ".config" / "printful" / "session.json")
 
     def test_saved_session_is_not_world_readable(self, tmp_path):
         """It holds the recipient block: name, address, email, phone."""
         path = str(tmp_path / "s.json")
         session = PrintfulSession(path)
-        session.draft.set_recipient(name="Jane", address1="1 St",
-                                    email="jane@example.com", phone="555")
+        session.draft.set_recipient(
+            name="Jane", address1="1 St", email="jane@example.com", phone="555"
+        )
         session.save_session()
         assert stat.S_IMODE(os.stat(path).st_mode) == 0o600
 
@@ -351,9 +347,18 @@ class TestPrintfulSession:
 # Orders
 # --------------------------------------------------------------------------
 
-_ITEM = {"source": "catalog", "catalog_variant_id": 4012, "quantity": 1,
-         "placements": [{"placement": "front", "technique": "dtg",
-                         "layers": [{"type": "file", "url": "http://x/a.png"}]}]}
+_ITEM = {
+    "source": "catalog",
+    "catalog_variant_id": 4012,
+    "quantity": 1,
+    "placements": [
+        {
+            "placement": "front",
+            "technique": "dtg",
+            "layers": [{"type": "file", "url": "http://x/a.png"}],
+        }
+    ],
+}
 
 
 class TestOrders:
@@ -400,27 +405,28 @@ class TestOrders:
         assert len(t.requests) == 1, "A rejected update must send nothing"
 
     def test_estimate_polls_until_completed(self):
-        t = FakeTransport([
-            {"data": {"id": "t1", "status": "pending"}},
-            {"data": {"id": "t1", "status": "pending"}},
-            {"data": {"id": "t1", "status": "completed",
-                      "costs": {"total": "25.00"}}},
-        ])
+        t = FakeTransport(
+            [
+                {"data": {"id": "t1", "status": "pending"}},
+                {"data": {"id": "t1", "status": "pending"}},
+                {"data": {"id": "t1", "status": "completed", "costs": {"total": "25.00"}}},
+            ]
+        )
         result = orders_mod.estimate_costs(t, {}, [_ITEM], interval=0, max_wait=5)
         assert result["data"]["status"] == "completed"
 
     def test_estimate_raises_on_failure_with_reasons(self):
-        t = FakeTransport([
-            {"data": {"id": "t1", "status": "pending"}},
-            {"data": {"id": "t1", "status": "failed",
-                      "failure_reasons": ["bad variant"]}},
-        ])
+        t = FakeTransport(
+            [
+                {"data": {"id": "t1", "status": "pending"}},
+                {"data": {"id": "t1", "status": "failed", "failure_reasons": ["bad variant"]}},
+            ]
+        )
         with pytest.raises(PrintfulError, match="bad variant"):
             orders_mod.estimate_costs(t, {}, [_ITEM], interval=0, max_wait=5)
 
     def test_estimate_timeout_names_task(self):
-        t = FakeTransport([{"data": {"id": "t9", "status": "pending"}}
-                           for _ in range(10)])
+        t = FakeTransport([{"data": {"id": "t9", "status": "pending"}} for _ in range(10)])
         with pytest.raises(PrintfulError, match="t9"):
             orders_mod.estimate_costs(t, {}, [_ITEM], interval=0, max_wait=0.01)
 
@@ -437,10 +443,12 @@ class TestOrders:
         shape raised AttributeError, so an estimate that would have succeeded
         never made its second request.
         """
-        t = FakeTransport([
-            {"data": [{"id": "t1", "status": "pending"}]},
-            {"data": [{"id": "t1", "status": "completed"}]},
-        ])
+        t = FakeTransport(
+            [
+                {"data": [{"id": "t1", "status": "pending"}]},
+                {"data": [{"id": "t1", "status": "completed"}]},
+            ]
+        )
         result = orders_mod.estimate_costs(t, {}, [_ITEM], interval=0, max_wait=5)
         assert result["data"][0]["status"] == "completed"
         assert len(t.requests) == 2, "the task id must survive the list unwrap"
@@ -449,6 +457,7 @@ class TestOrders:
 # --------------------------------------------------------------------------
 # Mockups
 # --------------------------------------------------------------------------
+
 
 class TestMockups:
     def test_create_requires_variants(self):
@@ -467,8 +476,7 @@ class TestMockups:
         position binds silently and builds a valid-looking wrong request.
         """
         t = FakeTransport([{"data": {"id": "t1"}}])
-        mockups_mod.create_task(t, 71, [4012], "http://x/a.png",
-                                "back", "embroidery", [5], "png")
+        mockups_mod.create_task(t, 71, [4012], "http://x/a.png", "back", "embroidery", [5], "png")
         body = t.requests[0].json
         product = body["products"][0]
         assert body["format"] == "png"
@@ -499,8 +507,9 @@ class TestMockups:
         t = FakeTransport([{"data": {"status": "pending"}} for _ in range(5)])
         with pytest.raises(PrintfulError) as caught:
             mockups_mod.wait_for_task(t, "t7", max_wait=0.01, interval=0)
-        assert caught.value.message == ("Mockup task t7 still pending after 0.01s. "
-                                        "Re-check with: mockup status t7")
+        assert caught.value.message == (
+            "Mockup task t7 still pending after 0.01s. Re-check with: mockup status t7"
+        )
 
     def test_templates_ask_for_one_product_not_a_page(self):
         """printful_core.endpoints.stores.list_templates shares this name and
@@ -514,6 +523,7 @@ class TestMockups:
 # --------------------------------------------------------------------------
 # Shapes the command layer depends on
 # --------------------------------------------------------------------------
+
 
 class TestSummarizedReturns:
     """Listing operations summarize before returning.
@@ -542,9 +552,19 @@ class TestSummarizedReturns:
         assert out["count"] == 1
 
     def test_rates(self):
-        t = FakeTransport([{"data": [{"shipping": "STANDARD",
-                                      "shipping_method_name": "Flat Rate",
-                                      "rate": "4.95"}]}])
+        t = FakeTransport(
+            [
+                {
+                    "data": [
+                        {
+                            "shipping": "STANDARD",
+                            "shipping_method_name": "Flat Rate",
+                            "rate": "4.95",
+                        }
+                    ]
+                }
+            ]
+        )
         out = shipping_mod.calculate_rates(t, {"country_code": "US"}, [_ITEM])
         assert out["rates"][0]["id"] == "STANDARD"
         assert out["rates"][0]["name"] == "Flat Rate"
@@ -568,20 +588,21 @@ class TestCountriesPagination:
 
     def _pages(self):
         return [
-            {"data": [{"code": "AF"}, {"code": "AL"}],
-             "paging": {"total": 5, "limit": 2, "offset": 0}},
-            {"data": [{"code": "DE"}, {"code": "GB"}],
-             "paging": {"total": 5, "limit": 2, "offset": 2}},
-            {"data": [{"code": "US"}],
-             "paging": {"total": 5, "limit": 2, "offset": 4}},
+            {
+                "data": [{"code": "AF"}, {"code": "AL"}],
+                "paging": {"total": 5, "limit": 2, "offset": 0},
+            },
+            {
+                "data": [{"code": "DE"}, {"code": "GB"}],
+                "paging": {"total": 5, "limit": 2, "offset": 2},
+            },
+            {"data": [{"code": "US"}], "paging": {"total": 5, "limit": 2, "offset": 4}},
         ]
 
     def test_every_page_is_requested(self):
         t = FakeTransport(self._pages())
         summary = shipping_mod.list_countries(t)
-        assert [c["code"] for c in summary["countries"]] == [
-            "AF", "AL", "DE", "GB", "US"
-        ]
+        assert [c["code"] for c in summary["countries"]] == ["AF", "AL", "DE", "GB", "US"]
         assert len(t.requests) == 3
 
     def test_us_present_after_pagination(self):
@@ -619,6 +640,7 @@ class TestFiles:
 # --------------------------------------------------------------------------
 # CLI guards (no network)
 # --------------------------------------------------------------------------
+
 
 def _session_path(tmp_path, name="s.json"):
     return str(tmp_path / name)
@@ -668,8 +690,16 @@ class TestCLIGuards:
         cli_mod = _fresh_cli()
         result = CliRunner().invoke(
             cli_mod.cli,
-            ["--json", "--dry-run", "--session", _session_path(tmp_path),
-             "orders", "confirm", "123", "--yes"],
+            [
+                "--json",
+                "--dry-run",
+                "--session",
+                _session_path(tmp_path),
+                "orders",
+                "confirm",
+                "123",
+                "--yes",
+            ],
             obj={},
         )
         assert result.exit_code == 0
@@ -683,8 +713,7 @@ class TestCLIGuards:
         cli_mod = _fresh_cli()
         result = CliRunner().invoke(
             cli_mod.cli,
-            ["--json", "--session", _session_path(tmp_path),
-             "orders", "confirm", "123"],
+            ["--json", "--session", _session_path(tmp_path), "orders", "confirm", "123"],
             obj={},
         )
         assert json.loads(result.output)["error"].startswith("Refusing to confirm")
@@ -693,19 +722,47 @@ class TestCLIGuards:
         cli_mod = _fresh_cli()
         path = _session_path(tmp_path)
         runner = CliRunner()
-        r1 = runner.invoke(cli_mod.cli, [
-            "--json", "--session", path, "draft", "recipient",
-            "--name", "Jane", "--address1", "1 St", "--city", "Berlin",
-            "--country-code", "DE", "--zip", "10115",
-        ], obj={})
+        r1 = runner.invoke(
+            cli_mod.cli,
+            [
+                "--json",
+                "--session",
+                path,
+                "draft",
+                "recipient",
+                "--name",
+                "Jane",
+                "--address1",
+                "1 St",
+                "--city",
+                "Berlin",
+                "--country-code",
+                "DE",
+                "--zip",
+                "10115",
+            ],
+            obj={},
+        )
         assert r1.exit_code == 0
 
         cli_mod._session = None
-        r2 = runner.invoke(cli_mod.cli, [
-            "--json", "--session", path, "draft", "add-item",
-            "--variant-id", "4012", "--quantity", "2",
-            "--image-url", "http://x/a.png",
-        ], obj={})
+        r2 = runner.invoke(
+            cli_mod.cli,
+            [
+                "--json",
+                "--session",
+                path,
+                "draft",
+                "add-item",
+                "--variant-id",
+                "4012",
+                "--quantity",
+                "2",
+                "--image-url",
+                "http://x/a.png",
+            ],
+            obj={},
+        )
         assert r2.exit_code == 0
         assert json.loads(r2.output)["summary"]["complete"] is True
 
@@ -713,8 +770,7 @@ class TestCLIGuards:
         cli_mod = _fresh_cli()
         result = CliRunner().invoke(
             cli_mod.cli,
-            ["--json", "--session", _session_path(tmp_path),
-             "config", "set", "nope", "x"],
+            ["--json", "--session", _session_path(tmp_path), "config", "set", "nope", "x"],
             obj={},
         )
         assert result.exit_code != 0
@@ -753,21 +809,45 @@ class TestCLIGuards:
         cli_mod = _fresh_cli()
         path = _session_path(tmp_path, "shipping.json")
         with open(path, "w") as handle:
-            json.dump({"draft": {
-                "recipient": {"name": "J", "address1": "1 St", "city": "Berlin",
-                              "country_code": "DE", "zip": "10115"},
-                "items": [{"source": "catalog", "catalog_variant_id": 4012,
-                           "quantity": 1, "placements": [{
-                               "placement": "front", "technique": "dtg",
-                               "layers": [{"type": "file",
-                                           "url": "http://x/a.png"}]}]}],
-                "external_id": None,
-                "shipping": "STANDARD",
-            }, "store_id": None, "files": [], "history": []}, handle)
+            json.dump(
+                {
+                    "draft": {
+                        "recipient": {
+                            "name": "J",
+                            "address1": "1 St",
+                            "city": "Berlin",
+                            "country_code": "DE",
+                            "zip": "10115",
+                        },
+                        "items": [
+                            {
+                                "source": "catalog",
+                                "catalog_variant_id": 4012,
+                                "quantity": 1,
+                                "placements": [
+                                    {
+                                        "placement": "front",
+                                        "technique": "dtg",
+                                        "layers": [{"type": "file", "url": "http://x/a.png"}],
+                                    }
+                                ],
+                            }
+                        ],
+                        "external_id": None,
+                        "shipping": "STANDARD",
+                    },
+                    "store_id": None,
+                    "files": [],
+                    "history": [],
+                },
+                handle,
+            )
 
         cli_mod._transport = FakeTransport([{"data": {"id": 999}}])
         result = CliRunner().invoke(
-            cli_mod.cli, ["--json", "--session", path, "orders", "create"], obj={},
+            cli_mod.cli,
+            ["--json", "--session", path, "orders", "create"],
+            obj={},
         )
         assert result.exit_code == 0, result.output
         sent = cli_mod._transport.requests[0]
@@ -785,13 +865,29 @@ class TestCLIGuards:
         """
         cli_mod = _fresh_cli()
         cli_mod._transport = FakeTransport([{"data": {"id": 999}}])
-        result = CliRunner().invoke(cli_mod.cli, [
-            "--json", "--session", _session_path(tmp_path, "items.json"),
-            "orders", "create",
-            "--items", '[{"catalog_variant_id": 4012, "quantity": 1}]',
-            "--name", "J", "--address1", "1 St", "--city", "Berlin",
-            "--country-code", "DE", "--zip", "10115",
-        ], obj={})
+        result = CliRunner().invoke(
+            cli_mod.cli,
+            [
+                "--json",
+                "--session",
+                _session_path(tmp_path, "items.json"),
+                "orders",
+                "create",
+                "--items",
+                '[{"catalog_variant_id": 4012, "quantity": 1}]',
+                "--name",
+                "J",
+                "--address1",
+                "1 St",
+                "--city",
+                "Berlin",
+                "--country-code",
+                "DE",
+                "--zip",
+                "10115",
+            ],
+            obj={},
+        )
         assert result.exit_code != 0
         error = json.loads(result.output)["error"]
         assert "placements" in error
@@ -803,20 +899,36 @@ class TestCLIGuards:
     def test_dry_run_suppresses_session_write(self, tmp_path):
         cli_mod = _fresh_cli()
         path = _session_path(tmp_path, "dry.json")
-        CliRunner().invoke(cli_mod.cli, [
-            "--json", "--dry-run", "--session", path, "draft", "add-item",
-            "--variant-id", "1",
-        ], obj={})
+        CliRunner().invoke(
+            cli_mod.cli,
+            [
+                "--json",
+                "--dry-run",
+                "--session",
+                path,
+                "draft",
+                "add-item",
+                "--variant-id",
+                "1",
+            ],
+            obj={},
+        )
         assert not os.path.exists(path)
 
     def test_store_use_json_lists_instead_of_prompting(self, tmp_path, monkeypatch):
         """An agent must get the store list back, never a blocked prompt."""
         cli_mod = _fresh_cli()
         monkeypatch.setenv("PRINTFUL_API_KEY", "t")
-        cli_mod._transport = FakeTransport([{"data": [
-            {"id": 1, "name": "Alpha", "type": "native"},
-            {"id": 2, "name": "Beta", "type": "square"},
-        ]}])
+        cli_mod._transport = FakeTransport(
+            [
+                {
+                    "data": [
+                        {"id": 1, "name": "Alpha", "type": "native"},
+                        {"id": 2, "name": "Beta", "type": "square"},
+                    ]
+                }
+            ]
+        )
         result = CliRunner().invoke(
             cli_mod.cli,
             ["--json", "--session", _session_path(tmp_path), "store", "use"],
@@ -838,14 +950,14 @@ class TestCLIGuards:
         )
         assert result.exit_code == 0
         assert json.loads(result.output)["store_id"] == "1135966"
-        assert json.load(open(path))["store_id"] == "1135966"
+        with open(path) as f:
+            assert json.load(f)["store_id"] == "1135966"
 
     def test_store_use_save_writes_config(self, tmp_path):
         cli_mod = _fresh_cli()
         result = CliRunner().invoke(
             cli_mod.cli,
-            ["--json", "--session", _session_path(tmp_path),
-             "store", "use", "42", "--save"],
+            ["--json", "--session", _session_path(tmp_path), "store", "use", "42", "--save"],
             obj={},
         )
         assert json.loads(result.output)["saved_to_config"] is True
@@ -855,12 +967,21 @@ class TestCLIGuards:
         """The account-level token error must say how to fix itself."""
         cli_mod = _fresh_cli()
         monkeypatch.setenv("PRINTFUL_API_KEY", "t")
-        cli_mod._transport = FakeTransport([PrintfulError(
-            "This endpoint requires `store_id`!", status_code=400,
-            detail={"data": "This endpoint requires `store_id`!",
-                    "error": {"reason": "BadRequest",
-                              "message": "This endpoint requires `store_id`!"}},
-        )])
+        cli_mod._transport = FakeTransport(
+            [
+                PrintfulError(
+                    "This endpoint requires `store_id`!",
+                    status_code=400,
+                    detail={
+                        "data": "This endpoint requires `store_id`!",
+                        "error": {
+                            "reason": "BadRequest",
+                            "message": "This endpoint requires `store_id`!",
+                        },
+                    },
+                )
+            ]
+        )
         result = CliRunner().invoke(
             cli_mod.cli,
             ["--json", "--session", _session_path(tmp_path), "store", "list"],

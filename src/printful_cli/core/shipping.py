@@ -1,4 +1,5 @@
 """Shipping operations for the CLI."""
+
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
@@ -15,17 +16,21 @@ def list_countries(transport: SyncTransport) -> Dict[str, Any]:
     return summary.countries(response)
 
 
-def calculate_rates(transport: SyncTransport, recipient: Dict[str, Any],
-                    items: List[Dict[str, Any]],
-                    currency: Optional[str] = None) -> Dict[str, Any]:
-    response = transport.send(
-        endpoints.calculate_rates(recipient, items, currency))
+def calculate_rates(
+    transport: SyncTransport,
+    recipient: Dict[str, Any],
+    items: List[Dict[str, Any]],
+    currency: Optional[str] = None,
+) -> Dict[str, Any]:
+    response = transport.send(endpoints.calculate_rates(recipient, items, currency))
     return summary.rates(response)
 
 
-def calculate_tax(transport: SyncTransport, country_code: str,
-                  state_code: Optional[str] = None,
-                  city: Optional[str] = None,
-                  zip_code: Optional[str] = None) -> Dict[str, Any]:
-    return transport.send(
-        endpoints.calculate_tax(country_code, state_code, city, zip_code))
+def calculate_tax(
+    transport: SyncTransport,
+    country_code: str,
+    state_code: Optional[str] = None,
+    city: Optional[str] = None,
+    zip_code: Optional[str] = None,
+) -> Dict[str, Any]:
+    return transport.send(endpoints.calculate_tax(country_code, state_code, city, zip_code))

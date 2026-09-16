@@ -3,6 +3,7 @@
 confirm_order submits an order for fulfillment and charges the account. Every
 caller must gate it behind an explicit confirmation from the operator.
 """
+
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
@@ -21,10 +22,14 @@ def _require_placements(items: List[Dict[str, Any]]) -> None:
             )
 
 
-def build_catalog_item(catalog_variant_id: int, quantity: int = 1,
-                       image_url: Optional[str] = None,
-                       placement: str = "front", technique: str = "dtg",
-                       external_id: Optional[str] = None) -> Dict[str, Any]:
+def build_catalog_item(
+    catalog_variant_id: int,
+    quantity: int = 1,
+    image_url: Optional[str] = None,
+    placement: str = "front",
+    technique: str = "dtg",
+    external_id: Optional[str] = None,
+) -> Dict[str, Any]:
     """Build one catalog order item in the shape the live API accepts."""
     if quantity < 1:
         raise ValueError(f"quantity must be >= 1, got {quantity}")
@@ -37,18 +42,18 @@ def build_catalog_item(catalog_variant_id: int, quantity: int = 1,
     if external_id:
         item["external_id"] = external_id
     if image_url:
-        item["placements"] = [{
-            "placement": placement,
-            "technique": technique,
-            "layers": [{"type": "file", "url": image_url}],
-        }]
+        item["placements"] = [
+            {
+                "placement": placement,
+                "technique": technique,
+                "layers": [{"type": "file", "url": image_url}],
+            }
+        ]
     return item
 
 
-def list_orders(limit: int = 20, offset: int = 0,
-                status: Optional[str] = None) -> Request:
-    return Request("GET", "/orders",
-                   params={"limit": limit, "offset": offset, "status": status})
+def list_orders(limit: int = 20, offset: int = 0, status: Optional[str] = None) -> Request:
+    return Request("GET", "/orders", params={"limit": limit, "offset": offset, "status": status})
 
 
 def get_order(order_id: str) -> Request:
@@ -56,16 +61,21 @@ def get_order(order_id: str) -> Request:
     return Request("GET", f"/orders/{order_id}")
 
 
-def create_order(recipient: Dict[str, Any], items: List[Dict[str, Any]],
-                 external_id: Optional[str] = None,
-                 shipping: Optional[str] = None) -> Request:
+def create_order(
+    recipient: Dict[str, Any],
+    items: List[Dict[str, Any]],
+    external_id: Optional[str] = None,
+    shipping: Optional[str] = None,
+) -> Request:
     """Create a DRAFT order. Drafts are not charged until confirmed."""
     if not items:
         raise ValueError("Creating an order requires at least one item.")
     _require_placements(items)
 
-    body: Dict[str, Any] = {"recipient": dict(recipient),
-                            "order_items": [dict(item) for item in items]}
+    body: Dict[str, Any] = {
+        "recipient": dict(recipient),
+        "order_items": [dict(item) for item in items],
+    }
     if external_id:
         body["external_id"] = external_id
     if shipping:
@@ -97,14 +107,15 @@ def list_shipments(order_id: str) -> Request:
     return Request("GET", f"/orders/{order_id}/shipments")
 
 
-def create_estimation_task(recipient: Dict[str, Any],
-                           items: List[Dict[str, Any]]) -> Request:
+def create_estimation_task(recipient: Dict[str, Any], items: List[Dict[str, Any]]) -> Request:
     """Start an asynchronous cost estimate. Free; places no order."""
     if not items:
         raise ValueError("Estimation requires at least one item.")
-    return Request("POST", "/order-estimation-tasks",
-                   json={"recipient": dict(recipient),
-                        "order_items": [dict(item) for item in items]})
+    return Request(
+        "POST",
+        "/order-estimation-tasks",
+        json={"recipient": dict(recipient), "order_items": [dict(item) for item in items]},
+    )
 
 
 def get_estimation_task(task_id: str) -> Request:

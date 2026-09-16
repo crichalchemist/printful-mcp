@@ -8,6 +8,7 @@ returns the v1-style envelope for both 4xx and 404:
 Reading only detail/title reduces every real error to "Unknown error" and hides
 its cause, so every known shape is tried here regardless of API version.
 """
+
 from __future__ import annotations
 
 from typing import Any, Dict, Mapping, Optional
@@ -28,16 +29,19 @@ RATE_LIMIT_HELP = (
 class PrintfulError(Exception):
     """A Printful API error, normalized across every envelope shape."""
 
-    def __init__(self, message: str, status_code: Optional[int] = None,
-                 detail: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self,
+        message: str,
+        status_code: Optional[int] = None,
+        detail: Optional[Dict[str, Any]] = None,
+    ):
         self.message = message
         self.status_code = status_code
         self.detail = detail or {}
         super().__init__(message)
 
     def to_dict(self) -> Dict[str, Any]:
-        return {"error": self.message, "status_code": self.status_code,
-                "detail": self.detail}
+        return {"error": self.message, "status_code": self.status_code, "detail": self.detail}
 
 
 class PrintfulAuthError(PrintfulError):
@@ -72,8 +76,9 @@ def extract_message(body: Any) -> Optional[str]:
     return None
 
 
-def raise_for_status(status: int, body: Any, url: str,
-                     headers: Optional[Mapping[str, str]] = None) -> None:
+def raise_for_status(
+    status: int, body: Any, url: str, headers: Optional[Mapping[str, str]] = None
+) -> None:
     """Raise the appropriate PrintfulError for a non-2xx response."""
     headers = headers or {}
 
@@ -95,8 +100,7 @@ def raise_for_status(status: int, body: Any, url: str,
     if status in (429, 419):
         retry_after = headers.get("Retry-After", "60")
         raise PrintfulRateLimitError(
-            f"Rate limit exceeded. Retry after {retry_after} seconds. "
-            + RATE_LIMIT_HELP,
+            f"Rate limit exceeded. Retry after {retry_after} seconds. " + RATE_LIMIT_HELP,
             retry_after=retry_after,
             status_code=status,
         )

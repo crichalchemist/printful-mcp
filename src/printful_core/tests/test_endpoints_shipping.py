@@ -10,16 +10,14 @@ def test_countries_path():
 
 
 def test_rates_path_and_method():
-    req = shipping.calculate_rates(RECIPIENT,
-                                   [{"catalog_variant_id": 4012, "quantity": 1}])
+    req = shipping.calculate_rates(RECIPIENT, [{"catalog_variant_id": 4012, "quantity": 1}])
     assert req.method == "POST"
     assert req.path == "/shipping-rates"
 
 
 def test_rates_default_missing_source():
     """The live API rejects an item without source: 'must be of type string'."""
-    req = shipping.calculate_rates(RECIPIENT,
-                                   [{"catalog_variant_id": 4012, "quantity": 1}])
+    req = shipping.calculate_rates(RECIPIENT, [{"catalog_variant_id": 4012, "quantity": 1}])
     assert req.json["order_items"][0]["source"] == "catalog"
 
 

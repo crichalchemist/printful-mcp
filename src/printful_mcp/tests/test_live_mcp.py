@@ -6,6 +6,7 @@ rewrite preserved live behavior. This can. It is the gate for this plan.
 Run: set -a; . ./.env; set +a; export PRINTFUL_STORE_ID=<id>
      .venv/bin/python -m pytest -m live -q
 """
+
 import json
 import os
 
@@ -16,8 +17,8 @@ from printful_core.transport import AsyncTransport
 from printful_mcp.models.inputs import (
     CreateEstimationTaskInput,
     GetProductInput,
-    ListCategoriesInput,
     ListCatalogProductsInput,
+    ListCategoriesInput,
     ListStoreTemplatesInput,
 )
 from printful_mcp.tools import catalog, orders, shipping, stores
@@ -27,8 +28,10 @@ pytestmark = pytest.mark.live
 
 def _require_credentials():
     if not os.environ.get("PRINTFUL_API_KEY"):
-        pytest.fail("PRINTFUL_API_KEY is not set. Live tests fail loudly rather "
-                    "than skip, so a green run means the API was really reached.")
+        pytest.fail(
+            "PRINTFUL_API_KEY is not set. Live tests fail loudly rather "
+            "than skip, so a green run means the API was really reached."
+        )
 
 
 @pytest.fixture
@@ -87,7 +90,8 @@ async def test_categories_return_real_rows(live_transport):
 async def test_the_caller_s_limit_is_respected(live_transport):
     """Proves the catalog tools do not silently walk every page."""
     out = await catalog.list_catalog_products(
-        live_transport, ListCatalogProductsInput(limit=2, format="json"))
+        live_transport, ListCatalogProductsInput(limit=2, format="json")
+    )
     assert len(json.loads(out)["data"]) == 2
 
 
@@ -98,23 +102,35 @@ async def test_an_estimate_can_be_started_and_read(live_transport):
     accepted and that reading it returns one of the three known states -- not
     that it completes, because completion timing is the API's business.
     """
-    items = [{
-        "source": "catalog",
-        "catalog_variant_id": 4012,
-        "quantity": 1,
-        "placements": [{
-            "placement": "front",
-            "technique": "dtg",
-            "layers": [{
-                "type": "file",
-                "url": "https://raw.githubusercontent.com/github/explore/main/topics/python/python.png",
-            }],
-        }],
-    }]
-    started = await orders.create_estimation_task(live_transport, CreateEstimationTaskInput(
-        recipient_country_code="US", recipient_state_code="CA",
-        recipient_city="San Francisco", recipient_zip="94107",
-        items_json=json.dumps(items)))
+    items = [
+        {
+            "source": "catalog",
+            "catalog_variant_id": 4012,
+            "quantity": 1,
+            "placements": [
+                {
+                    "placement": "front",
+                    "technique": "dtg",
+                    "layers": [
+                        {
+                            "type": "file",
+                            "url": "https://raw.githubusercontent.com/github/explore/main/topics/python/python.png",
+                        }
+                    ],
+                }
+            ],
+        }
+    ]
+    started = await orders.create_estimation_task(
+        live_transport,
+        CreateEstimationTaskInput(
+            recipient_country_code="US",
+            recipient_state_code="CA",
+            recipient_city="San Francisco",
+            recipient_zip="94107",
+            items_json=json.dumps(items),
+        ),
+    )
     assert not started.startswith("Error:"), started
     assert "Task ID:" in started
 
@@ -130,10 +146,12 @@ async def test_product_templates_come_back_under_the_v1_items_key(live_transport
     "Showing 0 templates" for a store that has templates -- a wrong answer
     shaped like a right one, which no offline test can catch.
     """
-    body = json.loads(await stores.list_store_templates(
-        live_transport, ListStoreTemplatesInput(format="json")))
+    body = json.loads(
+        await stores.list_store_templates(live_transport, ListStoreTemplatesInput(format="json"))
+    )
     assert isinstance(body, list) or "items" in body, (
-        f"expected a bare list or an 'items' key, got keys {sorted(body)}")
+        f"expected a bare list or an 'items' key, got keys {sorted(body)}"
+    )
 
 
 async def test_a_template_row_carries_the_fields_the_renderer_prints(live_transport):
@@ -144,13 +162,14 @@ async def test_a_template_row_carries_the_fields_the_renderer_prints(live_transp
     rather than passing when the store has no templates -- a vacuous pass here
     would read as confirmation.
     """
-    body = json.loads(await stores.list_store_templates(
-        live_transport, ListStoreTemplatesInput(format="json")))
+    body = json.loads(
+        await stores.list_store_templates(live_transport, ListStoreTemplatesInput(format="json"))
+    )
     rows = body if isinstance(body, list) else body.get("items", [])
     if not rows:
         pytest.skip("store has no product templates; row field names unverified")
-    missing = [k for k in ("title", "product_id", "created_at")
-               if k not in rows[0]]
+    missing = [k for k in ("title", "product_id", "created_at") if k not in rows[0]]
     assert not missing, (
         f"the renderer prints keys the API does not send: {missing}. "
-        f"The row actually carries {sorted(rows[0])}.")
+        f"The row actually carries {sorted(rows[0])}."
+    )

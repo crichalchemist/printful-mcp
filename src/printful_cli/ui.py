@@ -3,10 +3,11 @@
 Replaces the vendored cli-anything REPL skin. Colour is disabled when stdout is
 not a terminal, so piped output stays parseable.
 """
+
 from __future__ import annotations
 
 import sys
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Sequence
 
 import click
 
@@ -25,8 +26,7 @@ class UI:
         return self.stream.isatty()
 
     def _echo(self, text: str, **style) -> None:
-        click.echo(click.style(text, **style) if self.colour else text,
-                   file=self.stream)
+        click.echo(click.style(text, **style) if self.colour else text, file=self.stream)
 
     def section(self, title: str) -> None:
         self._echo(f"\n{title}", fg=_ACCENT, bold=True)
@@ -36,8 +36,9 @@ class UI:
         self._echo(f"✓ {message}", fg="green")
 
     def error(self, message: str) -> None:
-        click.echo(click.style(f"✗ {message}", fg="red") if self.colour
-                   else f"✗ {message}", err=True)
+        click.echo(
+            click.style(f"✗ {message}", fg="red") if self.colour else f"✗ {message}", err=True
+        )
 
     def warning(self, message: str) -> None:
         self._echo(f"⚠ {message}", fg="yellow")
@@ -48,8 +49,9 @@ class UI:
     def status(self, label: str, value: Any) -> None:
         self._echo(f"  {label}: {value}")
 
-    def table(self, headers: Sequence[str], rows: Sequence[Sequence[Any]],
-              max_width: int = 40) -> None:
+    def table(
+        self, headers: Sequence[str], rows: Sequence[Sequence[Any]], max_width: int = 40
+    ) -> None:
         """Print a simple aligned table."""
         if not headers:
             return
@@ -76,5 +78,4 @@ class UI:
 
     def prompt(self, text: str, count: int) -> int:
         """Ask for a 1-based selection. Callers must confirm a TTY first."""
-        return click.prompt(f"{text} [1-{count}]",
-                            type=click.IntRange(1, count))
+        return click.prompt(f"{text} [1-{count}]", type=click.IntRange(1, count))

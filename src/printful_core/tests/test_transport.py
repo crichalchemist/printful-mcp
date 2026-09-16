@@ -69,9 +69,7 @@ def make_async(responses, store_id=None):
 # The MCP server reaches the API through the async transport exclusively, so a
 # guarantee proved against the sync half alone is not proved. Every case below
 # runs against both.
-both_transports = pytest.mark.parametrize(
-    "make", [make_sync, make_async], ids=["sync", "async"]
-)
+both_transports = pytest.mark.parametrize("make", [make_sync, make_async], ids=["sync", "async"])
 
 
 async def send(transport, request):

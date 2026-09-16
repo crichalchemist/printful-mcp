@@ -26,6 +26,7 @@ testing it: `task_body` and `classify_task` are pure and need no transport, no
 clock and no event loop, while the drivers need all three. A caller that wants
 the decisions without the waiting calls the pure pair and writes its own loop.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -64,22 +65,26 @@ def classify_task(body: Dict[str, Any]) -> str:
 def _estimation_failure(body: Dict[str, Any]) -> PrintfulError:
     reasons = body.get("failure_reasons") or []
     return PrintfulError(
-        "Order estimation failed: "
-        + ("; ".join(str(r) for r in reasons) or "no reason given"),
-        detail=body)
+        "Order estimation failed: " + ("; ".join(str(r) for r in reasons) or "no reason given"),
+        detail=body,
+    )
 
 
-def _estimation_timeout(task_id: str, max_wait: float,
-                        latest: Dict[str, Any]) -> PrintfulError:
+def _estimation_timeout(task_id: str, max_wait: float, latest: Dict[str, Any]) -> PrintfulError:
     return PrintfulError(
         f"Order estimation task {task_id} still pending after {max_wait}s.",
-        detail={"task_id": task_id, "last_response": latest})
+        detail={"task_id": task_id, "last_response": latest},
+    )
 
 
-def poll_estimation_task(request: Request,
-                         send: Callable[[Request], Dict[str, Any]],
-                         task_id: str, created: Dict[str, Any],
-                         max_wait: float, interval: float) -> Dict[str, Any]:
+def poll_estimation_task(
+    request: Request,
+    send: Callable[[Request], Dict[str, Any]],
+    task_id: str,
+    created: Dict[str, Any],
+    max_wait: float,
+    interval: float,
+) -> Dict[str, Any]:
     """Re-send `request` until the estimation task settles.
 
     `created` is the response that opened the task; it is what the timeout
@@ -100,10 +105,13 @@ def poll_estimation_task(request: Request,
 
 
 async def poll_estimation_task_async(
-        request: Request,
-        send: Callable[[Request], Awaitable[Dict[str, Any]]],
-        task_id: str, created: Dict[str, Any],
-        max_wait: float, interval: float) -> Dict[str, Any]:
+    request: Request,
+    send: Callable[[Request], Awaitable[Dict[str, Any]]],
+    task_id: str,
+    created: Dict[str, Any],
+    max_wait: float,
+    interval: float,
+) -> Dict[str, Any]:
     """`poll_estimation_task` over an awaitable sender."""
     deadline = time.monotonic() + max_wait
     latest = created
@@ -126,8 +134,9 @@ def _mockup_failure(task_id: str, body: Dict[str, Any]) -> PrintfulError:
     )
 
 
-def _mockup_timeout(task_id: str, max_wait: float, latest: Dict[str, Any],
-                    recovery_hint: str) -> PrintfulError:
+def _mockup_timeout(
+    task_id: str, max_wait: float, latest: Dict[str, Any], recovery_hint: str
+) -> PrintfulError:
     """A timeout, plus whatever the caller tells its own users to do next.
 
     A mockup task outlives the call that was watching it, so the message is
@@ -144,10 +153,14 @@ def _mockup_timeout(task_id: str, max_wait: float, latest: Dict[str, Any],
     )
 
 
-def poll_mockup_task(request: Request,
-                     send: Callable[[Request], Dict[str, Any]],
-                     task_id: str, max_wait: float, interval: float,
-                     recovery_hint: str = "") -> Dict[str, Any]:
+def poll_mockup_task(
+    request: Request,
+    send: Callable[[Request], Dict[str, Any]],
+    task_id: str,
+    max_wait: float,
+    interval: float,
+    recovery_hint: str = "",
+) -> Dict[str, Any]:
     """Re-send `request` until the mockup task completes or fails.
 
     `recovery_hint` is appended to the timeout message after a single space.
@@ -167,10 +180,13 @@ def poll_mockup_task(request: Request,
 
 
 async def poll_mockup_task_async(
-        request: Request,
-        send: Callable[[Request], Awaitable[Dict[str, Any]]],
-        task_id: str, max_wait: float, interval: float,
-        recovery_hint: str = "") -> Dict[str, Any]:
+    request: Request,
+    send: Callable[[Request], Awaitable[Dict[str, Any]]],
+    task_id: str,
+    max_wait: float,
+    interval: float,
+    recovery_hint: str = "",
+) -> Dict[str, Any]:
     """`poll_mockup_task` over an awaitable sender."""
     deadline = time.monotonic() + max_wait
     latest: Dict[str, Any] = {}

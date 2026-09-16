@@ -1,5 +1,3 @@
-import pytest
-
 from printful_core.endpoints import catalog
 
 

@@ -3,15 +3,23 @@
 Safety: `orders confirm` submits an order for fulfillment and charges the account.
 `orders cancel` is destructive. Both refuse to run without an explicit --yes.
 """
+
 from __future__ import annotations
 
 import functools
 import json as json_mod
-import os
 import sys
 from typing import Any, Dict, List, Optional
 
 import click
+
+from printful_core.auth import CONFIG_FILE, Credentials, load_config, save_config
+from printful_core.errors import (
+    PrintfulAuthError,
+    PrintfulError,
+    PrintfulRateLimitError,
+)
+from printful_core.transport import SyncTransport
 
 from . import __version__
 from .core import catalog as catalog_mod
@@ -23,11 +31,6 @@ from .core import shipping as shipping_mod
 from .core import stores as stores_mod
 from .core import sync as sync_mod
 from .ui import UI
-from printful_core.auth import CONFIG_FILE, Credentials, load_config, save_config
-from printful_core.errors import (
-    PrintfulAuthError, PrintfulError, PrintfulRateLimitError,
-)
-from printful_core.transport import SyncTransport
 
 _repl_mode = False
 _session: Optional[session_mod.PrintfulSession] = None
@@ -38,6 +41,7 @@ _ui: Optional[UI] = None
 # --------------------------------------------------------------------------
 # Shared helpers
 # --------------------------------------------------------------------------
+
 
 def get_ui() -> UI:
     global _ui
@@ -98,9 +102,7 @@ def _print_dict(d: Dict[str, Any], indent: int = 0) -> None:
                 click.echo(f"{pad}{key}: ({len(value)} item(s))")
                 for item in value[:10]:
                     if isinstance(item, dict):
-                        preview = ", ".join(
-                            f"{k}={v}" for k, v in list(item.items())[:4]
-                        )
+                        preview = ", ".join(f"{k}={v}" for k, v in list(item.items())[:4])
                         click.echo(f"{pad}  - {preview}")
                     else:
                         click.echo(f"{pad}  - {item}")
@@ -118,8 +120,10 @@ def handle_error(func):
         try:
             return func(*args, **kwargs)
         except PrintfulRateLimitError as e:
-            _fail(e.message, {"error": e.message, "retry_after": e.retry_after,
-                              "status_code": e.status_code})
+            _fail(
+                e.message,
+                {"error": e.message, "retry_after": e.retry_after, "status_code": e.status_code},
+            )
         except PrintfulAuthError as e:
             _fail(e.message, e.to_dict())
         except PrintfulError as e:
@@ -166,8 +170,10 @@ def _parse_ids(value: Optional[str]) -> List[int]:
             continue
         try:
             out.append(int(chunk))
-        except ValueError:
-            raise ValueError(f"Invalid ID '{chunk}' — expected a comma-separated list of integers.")
+        except ValueError as exc:
+            raise ValueError(
+                f"Invalid ID '{chunk}' — expected a comma-separated list of integers."
+            ) from exc
     return out
 
 
@@ -177,15 +183,15 @@ def _load_items_json(items_json: Optional[str]) -> List[Dict[str, Any]]:
         try:
             items = json_mod.loads(items_json)
         except json_mod.JSONDecodeError as e:
-            raise ValueError(f"--items is not valid JSON: {e}")
+            raise ValueError(f"--items is not valid JSON: {e}") from e
         if not isinstance(items, list):
             raise ValueError("--items must be a JSON array of order items.")
         return items
     items = get_session().draft.items
     if not items:
         raise ValueError(
-            "No items given. Pass --items '[{\"catalog_variant_id\":123,"
-            "\"quantity\":1}]' or build a draft with: draft add-item"
+            'No items given. Pass --items \'[{"catalog_variant_id":123,'
+            '"quantity":1}]\' or build a draft with: draft add-item'
         )
     return items
 
@@ -195,8 +201,7 @@ def _require_yes(yes: bool, action: str, detail: str) -> None:
     if yes:
         return
     raise ValueError(
-        f"Refusing to {action} without --yes.\n{detail}\n"
-        f"Re-run with --yes once you are sure."
+        f"Refusing to {action} without --yes.\n{detail}\nRe-run with --yes once you are sure."
     )
 
 
@@ -204,16 +209,26 @@ def _require_yes(yes: bool, action: str, detail: str) -> None:
 # Main group
 # --------------------------------------------------------------------------
 
+
 @click.group(invoke_without_command=True)
 @click.option("--json", "use_json", is_flag=True, help="Output as JSON")
-@click.option("--dry-run", "dry_run", is_flag=True, default=False,
-              help="Run without saving session changes to disk")
-@click.option("--api-key", "api_key", default=None,
-              help="Printful API token (overrides env and config)")
-@click.option("--store-id", "store_id", default=None,
-              help="Store ID for account-level tokens (sets X-PF-Store-Id)")
-@click.option("--session", "session_file", default=None,
-              help="Path to the session file")
+@click.option(
+    "--dry-run",
+    "dry_run",
+    is_flag=True,
+    default=False,
+    help="Run without saving session changes to disk",
+)
+@click.option(
+    "--api-key", "api_key", default=None, help="Printful API token (overrides env and config)"
+)
+@click.option(
+    "--store-id",
+    "store_id",
+    default=None,
+    help="Store ID for account-level tokens (sets X-PF-Store-Id)",
+)
+@click.option("--session", "session_file", default=None, help="Path to the session file")
 @click.version_option(version=__version__, prog_name="printful")
 @click.pass_context
 def cli(ctx, use_json, dry_run, api_key, store_id, session_file):
@@ -242,13 +257,14 @@ def auto_save_on_exit(ctx, result, use_json, dry_run, api_key, store_id, session
     if sess._modified:
         try:
             sess.save_session()
-        except Exception as e:  # pragma: no cover - disk failure path
+        except OSError as e:  # pragma: no cover - disk failure path
             click.echo(f"Warning: Auto-save failed: {e}", err=True)
 
 
 # --------------------------------------------------------------------------
 # catalog
 # --------------------------------------------------------------------------
+
 
 @cli.group()
 def catalog():
@@ -351,8 +367,7 @@ def catalog_categories(ctx, limit, offset):
         table={
             "headers": ["ID", "Title", "Parent"],
             "rows": [
-                [str(c.get("id")), str(c.get("title")), str(c.get("parent_id"))]
-                for c in rows
+                [str(c.get("id")), str(c.get("title")), str(c.get("parent_id"))] for c in rows
             ],
         },
     )
@@ -383,6 +398,7 @@ def catalog_size_guide(ctx, product_id, unit):
 # orders
 # --------------------------------------------------------------------------
 
+
 @cli.group()
 def orders():
     """Manage orders. `confirm` and `cancel` require --yes."""
@@ -403,8 +419,12 @@ def orders_list(ctx, limit, offset, status):
         table={
             "headers": ["ID", "Status", "Created", "Total"],
             "rows": [
-                [str(o["id"]), str(o["status"]), str(o["created"]),
-                 f"{o['total']} {o['currency'] or ''}".strip()]
+                [
+                    str(o["id"]),
+                    str(o["status"]),
+                    str(o["created"]),
+                    f"{o['total']} {o['currency'] or ''}".strip(),
+                ]
                 for o in summary["orders"]
             ],
         },
@@ -422,8 +442,12 @@ def orders_get(ctx, order_id):
 
 
 @orders.command("create")
-@click.option("--items", "items_json", default=None,
-              help="JSON array of order items (defaults to the session draft)")
+@click.option(
+    "--items",
+    "items_json",
+    default=None,
+    help="JSON array of order items (defaults to the session draft)",
+)
 @click.option("--name", default=None)
 @click.option("--address1", default=None)
 @click.option("--city", default=None)
@@ -434,14 +458,19 @@ def orders_get(ctx, order_id):
 @click.option("--external-id", default=None)
 @click.pass_context
 @handle_error
-def orders_create(ctx, items_json, name, address1, city, state_code, country_code,
-                  zip_code, email, external_id):
+def orders_create(
+    ctx, items_json, name, address1, city, state_code, country_code, zip_code, email, external_id
+):
     """Create a DRAFT order. Drafts are not charged until confirmed."""
     sess = get_session()
     recipient_flags = {
-        "name": name, "address1": address1, "city": city,
-        "state_code": state_code, "country_code": country_code,
-        "zip": zip_code, "email": email,
+        "name": name,
+        "address1": address1,
+        "city": city,
+        "state_code": state_code,
+        "country_code": country_code,
+        "zip": zip_code,
+        "email": email,
     }
     if any(v for v in recipient_flags.values()):
         sess.draft.set_recipient(**recipient_flags)
@@ -467,18 +496,25 @@ def orders_create(ctx, items_json, name, address1, city, state_code, country_cod
         payload = sess.draft.to_api_payload()
 
     if ctx.obj.get("dry_run"):
-        output(ctx, {"dry_run": True, "would_post": "/v2/orders", "payload": payload},
-               message="Dry run — no order created.")
+        output(
+            ctx,
+            {"dry_run": True, "would_post": "/v2/orders", "payload": payload},
+            message="Dry run — no order created.",
+        )
         return
 
     data = orders_mod.create_order(
-        get_transport(ctx), payload["recipient"], payload["order_items"],
-        payload.get("external_id"), payload.get("shipping"),
+        get_transport(ctx),
+        payload["recipient"],
+        payload["order_items"],
+        payload.get("external_id"),
+        payload.get("shipping"),
     )
     body = data.get("data", data)
     sess.save_history(f"orders create -> {body.get('id')}", {"id": body.get("id")})
-    output(ctx, body,
-           message=f"Draft order {body.get('id')} created (not charged until confirmed).")
+    output(
+        ctx, body, message=f"Draft order {body.get('id')} created (not charged until confirmed)."
+    )
 
 
 @orders.command("update")
@@ -489,13 +525,15 @@ def orders_create(ctx, items_json, name, address1, city, state_code, country_cod
 @handle_error
 def orders_update(ctx, order_id, shipping, external_id):
     """Update a draft order (PATCH)."""
-    payload = {k: v for k, v in
-               {"shipping": shipping, "external_id": external_id}.items() if v}
+    payload = {k: v for k, v in {"shipping": shipping, "external_id": external_id}.items() if v}
     if not payload:
         raise ValueError("Nothing to update. Pass --shipping and/or --external-id.")
     if ctx.obj.get("dry_run"):
-        output(ctx, {"dry_run": True, "would_patch": f"/v2/orders/{order_id}",
-                     "payload": payload}, message="Dry run — no change made.")
+        output(
+            ctx,
+            {"dry_run": True, "would_patch": f"/v2/orders/{order_id}", "payload": payload},
+            message="Dry run — no change made.",
+        )
         return
     data = orders_mod.update_order(get_transport(ctx), order_id, payload)
     output(ctx, data.get("data", data), message=f"Order {order_id} updated.")
@@ -503,17 +541,20 @@ def orders_update(ctx, order_id, shipping, external_id):
 
 @orders.command("cancel")
 @click.argument("order_id")
-@click.option("--yes", is_flag=True, default=False,
-              help="Required. Confirms this destructive action.")
+@click.option(
+    "--yes", is_flag=True, default=False, help="Required. Confirms this destructive action."
+)
 @click.pass_context
 @handle_error
 def orders_cancel(ctx, order_id, yes):
     """Cancel an order. DESTRUCTIVE — requires --yes."""
-    _require_yes(yes, f"cancel order {order_id}",
-                 "Cancelling an order cannot be undone.")
+    _require_yes(yes, f"cancel order {order_id}", "Cancelling an order cannot be undone.")
     if ctx.obj.get("dry_run"):
-        output(ctx, {"dry_run": True, "would_delete": f"/v2/orders/{order_id}"},
-               message="Dry run — nothing cancelled.")
+        output(
+            ctx,
+            {"dry_run": True, "would_delete": f"/v2/orders/{order_id}"},
+            message="Dry run — nothing cancelled.",
+        )
         return
     data = orders_mod.cancel_order(get_transport(ctx), order_id)
     get_session().save_history(f"orders cancel {order_id}", {"order_id": order_id})
@@ -522,33 +563,48 @@ def orders_cancel(ctx, order_id, yes):
 
 @orders.command("confirm")
 @click.argument("order_id")
-@click.option("--yes", is_flag=True, default=False,
-              help="Required. Confirms that this CHARGES your account.")
+@click.option(
+    "--yes", is_flag=True, default=False, help="Required. Confirms that this CHARGES your account."
+)
 @click.pass_context
 @handle_error
 def orders_confirm(ctx, order_id, yes):
     """Confirm an order for fulfillment. CHARGES YOUR ACCOUNT — requires --yes."""
     _require_yes(
-        yes, f"confirm order {order_id}",
+        yes,
+        f"confirm order {order_id}",
         "Confirming submits the order to production and CHARGES your Printful account. "
         "This is real money and cannot be undone once fulfillment starts.",
     )
     if ctx.obj.get("dry_run"):
-        output(ctx, {"dry_run": True,
-                     "would_post": f"/v2/orders/{order_id}/confirmation"},
-               message="Dry run — order NOT confirmed, nothing charged.")
+        output(
+            ctx,
+            {"dry_run": True, "would_post": f"/v2/orders/{order_id}/confirmation"},
+            message="Dry run — order NOT confirmed, nothing charged.",
+        )
         return
     data = orders_mod.confirm_order(get_transport(ctx), order_id)
     get_session().save_history(f"orders confirm {order_id}", {"order_id": order_id})
-    output(ctx, data.get("data", data),
-           message=f"Order {order_id} confirmed and submitted for fulfillment.")
+    output(
+        ctx,
+        data.get("data", data),
+        message=f"Order {order_id} confirmed and submitted for fulfillment.",
+    )
 
 
 @orders.command("estimate")
-@click.option("--items", "items_json", default=None,
-              help="JSON array of order items (defaults to the session draft)")
-@click.option("--no-poll", is_flag=True, default=False,
-              help="Return the task ID without waiting for the result")
+@click.option(
+    "--items",
+    "items_json",
+    default=None,
+    help="JSON array of order items (defaults to the session draft)",
+)
+@click.option(
+    "--no-poll",
+    is_flag=True,
+    default=False,
+    help="Return the task ID without waiting for the result",
+)
 @click.option("--max-wait", default=30.0, show_default=True)
 @click.pass_context
 @handle_error
@@ -564,8 +620,11 @@ def orders_estimate(ctx, items_json, no_poll, max_wait):
         )
     payload = {"recipient": recipient, "order_items": items}
     if ctx.obj.get("dry_run"):
-        output(ctx, {"dry_run": True, "would_post": "/v2/order-estimation-tasks",
-                     "payload": payload}, message="Dry run — no estimate requested.")
+        output(
+            ctx,
+            {"dry_run": True, "would_post": "/v2/order-estimation-tasks", "payload": payload},
+            message="Dry run — no estimate requested.",
+        )
         return
     data = orders_mod.estimate_costs(
         get_transport(ctx), recipient, items, poll=not no_poll, max_wait=max_wait
@@ -597,14 +656,19 @@ def orders_shipments(ctx, order_id):
 # ship
 # --------------------------------------------------------------------------
 
+
 @cli.group()
 def ship():
     """Shipping rates, countries, and tax."""
 
 
 @ship.command("rates")
-@click.option("--items", "items_json", default=None,
-              help="JSON array of order items (defaults to the session draft)")
+@click.option(
+    "--items",
+    "items_json",
+    default=None,
+    help="JSON array of order items (defaults to the session draft)",
+)
 @click.option("--country-code", default=None)
 @click.option("--state-code", default=None)
 @click.option("--city", default=None)
@@ -617,26 +681,29 @@ def ship_rates(ctx, items_json, country_code, state_code, city, zip_code, curren
     sess = get_session()
     recipient = dict(sess.draft.recipient)
     for key, value in {
-        "country_code": country_code, "state_code": state_code,
-        "city": city, "zip": zip_code,
+        "country_code": country_code,
+        "state_code": state_code,
+        "city": city,
+        "zip": zip_code,
     }.items():
         if value:
             recipient[key] = value
     if not recipient.get("country_code"):
         raise ValueError("A recipient country is required (--country-code).")
     items = _load_items_json(items_json)
-    summary = shipping_mod.calculate_rates(
-        get_transport(ctx), recipient, items, currency
-    )
+    summary = shipping_mod.calculate_rates(get_transport(ctx), recipient, items, currency)
     output(
         ctx,
         summary,
         table={
             "headers": ["ID", "Name", "Rate", "Days"],
             "rows": [
-                [str(r["id"]), str(r["name"]),
-                 f"{r['rate']} {r['currency'] or ''}".strip(),
-                 f"{r['min_days']}-{r['max_days']}"]
+                [
+                    str(r["id"]),
+                    str(r["name"]),
+                    f"{r['rate']} {r['currency'] or ''}".strip(),
+                    f"{r['min_days']}-{r['max_days']}",
+                ]
                 for r in summary["rates"]
             ],
         },
@@ -652,11 +719,17 @@ def ship_countries(ctx):
     if ctx.obj.get("json"):
         output(ctx, summary)
         return
-    output(ctx, summary, table={
-        "headers": ["Code", "Name", "States"],
-        "rows": [[str(c["code"]), str(c["name"]), str(c["states"])]
-                 for c in summary["countries"][:50]],
-    })
+    output(
+        ctx,
+        summary,
+        table={
+            "headers": ["Code", "Name", "States"],
+            "rows": [
+                [str(c["code"]), str(c["name"]), str(c["states"])]
+                for c in summary["countries"][:50]
+            ],
+        },
+    )
 
 
 @ship.command("tax")
@@ -668,15 +741,14 @@ def ship_countries(ctx):
 @handle_error
 def ship_tax(ctx, country_code, state_code, city, zip_code):
     """Calculate a tax rate (v1 — no v2 equivalent exists)."""
-    data = shipping_mod.calculate_tax(
-        get_transport(ctx), country_code, state_code, city, zip_code
-    )
+    data = shipping_mod.calculate_tax(get_transport(ctx), country_code, state_code, city, zip_code)
     output(ctx, data)
 
 
 # --------------------------------------------------------------------------
 # mockup
 # --------------------------------------------------------------------------
+
 
 @cli.group()
 def mockup():
@@ -690,25 +762,40 @@ def mockup():
 @click.option("--placement", default="front", show_default=True)
 @click.option("--technique", default="dtg", show_default=True)
 @click.option("--style-ids", default=None, help="Comma-separated mockup style IDs")
-@click.option("--format", "image_format", default="jpg",
-              type=click.Choice(["jpg", "png"]), show_default=True)
+@click.option(
+    "--format", "image_format", default="jpg", type=click.Choice(["jpg", "png"]), show_default=True
+)
 @click.option("--wait", is_flag=True, default=False, help="Poll until the task finishes")
 @click.pass_context
 @handle_error
-def mockup_create(ctx, product_id, variant_ids, image_url, placement, technique,
-                  style_ids, image_format, wait):
+def mockup_create(
+    ctx, product_id, variant_ids, image_url, placement, technique, style_ids, image_format, wait
+):
     """Create a mockup generation task."""
     variants = _parse_ids(variant_ids)
     styles = _parse_ids(style_ids)
     if ctx.obj.get("dry_run"):
-        output(ctx, {"dry_run": True, "would_post": "/v2/mockup-tasks",
-                     "product_id": product_id, "variant_ids": variants},
-               message="Dry run — no mockup task created.")
+        output(
+            ctx,
+            {
+                "dry_run": True,
+                "would_post": "/v2/mockup-tasks",
+                "product_id": product_id,
+                "variant_ids": variants,
+            },
+            message="Dry run — no mockup task created.",
+        )
         return
     transport = get_transport(ctx)
     data = mockups_mod.create_task(
-        transport, product_id, variants, image_url, placement, technique,
-        styles or None, image_format,
+        transport,
+        product_id,
+        variants,
+        image_url,
+        placement,
+        technique,
+        styles or None,
+        image_format,
     )
     body = data.get("data", data)
     task_id = body.get("id") if isinstance(body, dict) else None
@@ -729,10 +816,14 @@ def mockup_create(ctx, product_id, variant_ids, image_url, placement, technique,
 def mockup_status(ctx, task_id, wait):
     """Check a mockup generation task."""
     transport = get_transport(ctx)
-    data = (mockups_mod.wait_for_task(transport, task_id) if wait
-            else mockups_mod.get_task(transport, task_id))
-    output(ctx, {"task": data.get("data", data),
-                 "mockup_urls": mockups_mod.extract_mockup_urls(data)})
+    data = (
+        mockups_mod.wait_for_task(transport, task_id)
+        if wait
+        else mockups_mod.get_task(transport, task_id)
+    )
+    output(
+        ctx, {"task": data.get("data", data), "mockup_urls": mockups_mod.extract_mockup_urls(data)}
+    )
 
 
 @mockup.command("styles")
@@ -759,6 +850,7 @@ def mockup_templates(ctx, product_id):
 # files
 # --------------------------------------------------------------------------
 
+
 @cli.group()
 def files():
     """File library. Note: Printful has no list-files endpoint."""
@@ -767,15 +859,19 @@ def files():
 @files.command("add")
 @click.option("--url", required=True, help="URL of the file to add")
 @click.option("--filename", default=None)
-@click.option("--hidden", is_flag=True, default=False,
-              help="Do not show the file in the library UI")
+@click.option(
+    "--hidden", is_flag=True, default=False, help="Do not show the file in the library UI"
+)
 @click.pass_context
 @handle_error
 def files_add(ctx, url, filename, hidden):
     """Add a file to the library by URL."""
     if ctx.obj.get("dry_run"):
-        output(ctx, {"dry_run": True, "would_post": "/v2/files", "url": url},
-               message="Dry run — no file added.")
+        output(
+            ctx,
+            {"dry_run": True, "would_post": "/v2/files", "url": url},
+            message="Dry run — no file added.",
+        )
         return
     data = files_mod.add_file(get_transport(ctx), url, filename, visible=not hidden)
     body = data.get("data", data)
@@ -800,16 +896,23 @@ def files_get(ctx, file_id):
 def files_list(ctx):
     """List files added through this CLI (session-local, not a server query)."""
     result = files_mod.list_added(get_session().files)
-    output(ctx, result, table={
-        "headers": ["ID", "Filename", "Added"],
-        "rows": [[str(f.get("id")), str(f.get("filename") or "-"),
-                  str(f.get("added_at"))] for f in result["files"]],
-    })
+    output(
+        ctx,
+        result,
+        table={
+            "headers": ["ID", "Filename", "Added"],
+            "rows": [
+                [str(f.get("id")), str(f.get("filename") or "-"), str(f.get("added_at"))]
+                for f in result["files"]
+            ],
+        },
+    )
 
 
 # --------------------------------------------------------------------------
 # store
 # --------------------------------------------------------------------------
+
 
 @cli.group()
 def store():
@@ -822,11 +925,14 @@ def store():
 def store_list(ctx):
     """List stores available to the token."""
     summary = stores_mod.list_stores(get_transport(ctx))
-    output(ctx, summary, table={
-        "headers": ["ID", "Name", "Type"],
-        "rows": [[str(s["id"]), str(s["name"]), str(s["type"])]
-                 for s in summary["stores"]],
-    })
+    output(
+        ctx,
+        summary,
+        table={
+            "headers": ["ID", "Name", "Type"],
+            "rows": [[str(s["id"]), str(s["name"]), str(s["type"])] for s in summary["stores"]],
+        },
+    )
 
 
 @store.command("stats")
@@ -858,8 +964,12 @@ def store_templates(ctx, limit, offset):
 
 @store.command("use")
 @click.argument("store_id", required=False)
-@click.option("--save", is_flag=True, default=False,
-              help="Also persist this store as the default in the config file")
+@click.option(
+    "--save",
+    is_flag=True,
+    default=False,
+    help="Also persist this store as the default in the config file",
+)
 @click.pass_context
 @handle_error
 def store_use(ctx, store_id, save):
@@ -889,12 +999,12 @@ def store_use(ctx, store_id, save):
         ui.section("Available stores")
         ui.table(
             ["#", "ID", "Name", "Type"],
-            [[str(i + 1), str(s["id"]), str(s["name"]), str(s["type"])]
-             for i, s in enumerate(rows)],
+            [
+                [str(i + 1), str(s["id"]), str(s["name"]), str(s["type"])]
+                for i, s in enumerate(rows)
+            ],
         )
-        choice = click.prompt(
-            f"Select a store [1-{len(rows)}]", type=click.IntRange(1, len(rows))
-        )
+        choice = click.prompt(f"Select a store [1-{len(rows)}]", type=click.IntRange(1, len(rows)))
         selected = rows[choice - 1]
         store_id = str(selected["id"])
         ui.info(f"Selected {selected['name']} ({store_id})")
@@ -908,15 +1018,17 @@ def store_use(ctx, store_id, save):
     output(
         ctx,
         {"store_id": str(store_id), "saved_to_config": bool(save)},
-        message=(f"Active store set to {store_id}"
-                 + (" and saved as the default." if save else
-                    ". Add --save to make it the default.")),
+        message=(
+            f"Active store set to {store_id}"
+            + (" and saved as the default." if save else ". Add --save to make it the default.")
+        ),
     )
 
 
 # --------------------------------------------------------------------------
 # sync
 # --------------------------------------------------------------------------
+
 
 @cli.group()
 def sync():
@@ -948,6 +1060,7 @@ def sync_get(ctx, sync_product_id):
 # draft
 # --------------------------------------------------------------------------
 
+
 @cli.group()
 def draft():
     """Build an order across multiple commands before submitting it."""
@@ -974,14 +1087,21 @@ def draft_show(ctx):
 @click.option("--phone", default=None)
 @click.pass_context
 @handle_error
-def draft_recipient(ctx, name, address1, address2, city, state_code, country_code,
-                    zip_code, email, phone):
+def draft_recipient(
+    ctx, name, address1, address2, city, state_code, country_code, zip_code, email, phone
+):
     """Set recipient fields on the draft."""
     sess = get_session()
     fields = {
-        "name": name, "address1": address1, "address2": address2, "city": city,
-        "state_code": state_code, "country_code": country_code, "zip": zip_code,
-        "email": email, "phone": phone,
+        "name": name,
+        "address1": address1,
+        "address2": address2,
+        "city": city,
+        "state_code": state_code,
+        "country_code": country_code,
+        "zip": zip_code,
+        "email": email,
+        "phone": phone,
     }
     if not any(v for v in fields.values()):
         raise ValueError("Pass at least one recipient field to set.")
@@ -999,16 +1119,16 @@ def draft_recipient(ctx, name, address1, address2, city, state_code, country_cod
 @click.option("--external-id", default=None)
 @click.pass_context
 @handle_error
-def draft_add_item(ctx, variant_id, quantity, image_url, placement, technique,
-                   external_id):
+def draft_add_item(ctx, variant_id, quantity, image_url, placement, technique, external_id):
     """Add a line item to the draft."""
     sess = get_session()
-    item = sess.draft.add_item(
-        variant_id, quantity, placement, image_url, technique, external_id
-    )
+    item = sess.draft.add_item(variant_id, quantity, placement, image_url, technique, external_id)
     sess.touch()
-    output(ctx, {"added": item, "summary": sess.draft.summary()},
-           message=f"Added variant {variant_id} x{quantity}.")
+    output(
+        ctx,
+        {"added": item, "summary": sess.draft.summary()},
+        message=f"Added variant {variant_id} x{quantity}.",
+    )
 
 
 @draft.command("remove-item")
@@ -1020,8 +1140,9 @@ def draft_remove_item(ctx, index):
     sess = get_session()
     removed = sess.draft.remove_item(index)
     sess.touch()
-    output(ctx, {"removed": removed, "summary": sess.draft.summary()},
-           message=f"Removed item {index}.")
+    output(
+        ctx, {"removed": removed, "summary": sess.draft.summary()}, message=f"Removed item {index}."
+    )
 
 
 @draft.command("clear")
@@ -1046,6 +1167,7 @@ def draft_submit(ctx):
 # --------------------------------------------------------------------------
 # session
 # --------------------------------------------------------------------------
+
 
 @cli.group("session")
 def session_group():
@@ -1092,6 +1214,7 @@ def session_clear(ctx):
 # --------------------------------------------------------------------------
 # config
 # --------------------------------------------------------------------------
+
 
 @cli.group()
 def config():
@@ -1156,6 +1279,7 @@ def config_path(ctx):
 # --------------------------------------------------------------------------
 # test
 # --------------------------------------------------------------------------
+
 
 @cli.command("test")
 @click.pass_context
@@ -1226,14 +1350,14 @@ def repl(ctx):
             pass
         except click.ClickException as e:
             ui.error(e.format_message())
-        except Exception as e:  # pragma: no cover - interactive safety net
+        except Exception as e:  # noqa: BLE001 - REPL must survive any user command error; pragma: no cover
             ui.error(str(e))
 
     if sess._modified:
         try:
             sess.save_session()
             ui.success("Session saved.")
-        except Exception as e:
+        except OSError as e:
             ui.error(f"Could not save session: {e}")
     _repl_mode = False
 

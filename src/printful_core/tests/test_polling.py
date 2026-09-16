@@ -5,6 +5,7 @@ settle a task differently from the CLI's, moving the loops into the core bought
 nothing. Every driver test therefore runs both colours over the same responses
 and compares what they produced, message text included.
 """
+
 import pytest
 
 from printful_core.errors import PrintfulError
@@ -67,6 +68,7 @@ async def raised_async(fn, *args, **kwargs):
 # The pure decisions, exercised with no transport at all
 # --------------------------------------------------------------------------
 
+
 def test_task_body_unwraps_the_data_envelope():
     assert task_body({"data": {"status": "completed"}}) == {"status": "completed"}
 
@@ -105,8 +107,7 @@ def test_classify_treats_anything_unsettled_as_pending():
 # --------------------------------------------------------------------------
 
 DONE = {"data": {"id": "t1", "status": "completed", "costs": {"total": "25.00"}}}
-FAILED = {"data": {"id": "t1", "status": "failed",
-                   "failure_reasons": ["bad variant", "no stock"]}}
+FAILED = {"data": {"id": "t1", "status": "failed", "failure_reasons": ["bad variant", "no stock"]}}
 
 
 async def test_estimation_drivers_return_the_same_completed_task():
@@ -114,19 +115,19 @@ async def test_estimation_drivers_return_the_same_completed_task():
     async_send = make_async_sender([PENDING, PENDING, DONE])
 
     from_sync = poll_estimation_task(REQUEST, sync_send, "t1", {}, 5.0, 0)
-    from_async = await poll_estimation_task_async(
-        REQUEST, async_send, "t1", {}, 5.0, 0)
+    from_async = await poll_estimation_task_async(REQUEST, async_send, "t1", {}, 5.0, 0)
 
     assert from_sync == from_async == DONE
     assert len(sync_send.sent) == len(async_send.sent) == 3
 
 
 async def test_estimation_drivers_report_the_same_failure():
-    sync_error = raised(poll_estimation_task, REQUEST,
-                        make_sender([PENDING, FAILED]), "t1", {}, 5.0, 0)
-    async_error = await raised_async(poll_estimation_task_async, REQUEST,
-                                     make_async_sender([PENDING, FAILED]),
-                                     "t1", {}, 5.0, 0)
+    sync_error = raised(
+        poll_estimation_task, REQUEST, make_sender([PENDING, FAILED]), "t1", {}, 5.0, 0
+    )
+    async_error = await raised_async(
+        poll_estimation_task_async, REQUEST, make_async_sender([PENDING, FAILED]), "t1", {}, 5.0, 0
+    )
 
     assert sync_error.message == async_error.message
     assert sync_error.detail == async_error.detail == FAILED["data"]
@@ -134,16 +135,23 @@ async def test_estimation_drivers_report_the_same_failure():
 
 
 def test_estimation_failure_says_so_when_printful_gives_no_reason():
-    error = raised(poll_estimation_task, REQUEST,
-                   make_sender([{"data": {"status": "failed"}}]), "t1", {}, 5.0, 0)
+    error = raised(
+        poll_estimation_task,
+        REQUEST,
+        make_sender([{"data": {"status": "failed"}}]),
+        "t1",
+        {},
+        5.0,
+        0,
+    )
     assert error.message == "Order estimation failed: no reason given"
 
 
 async def test_estimation_drivers_report_the_same_timeout():
-    sync_error = raised(poll_estimation_task, REQUEST, make_sender([]),
-                        "t9", {}, 0.01, 0)
-    async_error = await raised_async(poll_estimation_task_async, REQUEST,
-                                     make_async_sender([]), "t9", {}, 0.01, 0)
+    sync_error = raised(poll_estimation_task, REQUEST, make_sender([]), "t9", {}, 0.01, 0)
+    async_error = await raised_async(
+        poll_estimation_task_async, REQUEST, make_async_sender([]), "t9", {}, 0.01, 0
+    )
 
     assert sync_error.message == async_error.message
     assert sync_error.detail == async_error.detail
@@ -154,10 +162,10 @@ async def test_estimation_drivers_report_the_same_timeout():
 async def test_estimation_timeout_before_the_first_reread_reports_the_created_task():
     """An already-spent deadline still has something to show the caller."""
     created = {"data": {"id": "t9", "status": "pending"}}
-    sync_error = raised(poll_estimation_task, REQUEST, make_sender([]),
-                        "t9", created, 0, 0)
-    async_error = await raised_async(poll_estimation_task_async, REQUEST,
-                                     make_async_sender([]), "t9", created, 0, 0)
+    sync_error = raised(poll_estimation_task, REQUEST, make_sender([]), "t9", created, 0, 0)
+    async_error = await raised_async(
+        poll_estimation_task_async, REQUEST, make_async_sender([]), "t9", created, 0, 0
+    )
 
     assert sync_error.detail == async_error.detail
     assert sync_error.detail["last_response"] is created
@@ -166,10 +174,10 @@ async def test_estimation_timeout_before_the_first_reread_reports_the_created_ta
 async def test_estimation_drivers_both_read_a_task_delivered_in_a_list():
     """Widened in task 15: this shape used to raise AttributeError here."""
     listed = {"data": [{"id": "t1", "status": "completed"}]}
-    from_sync = poll_estimation_task(REQUEST, make_sender([listed]),
-                                     "t1", {}, 5.0, 0)
+    from_sync = poll_estimation_task(REQUEST, make_sender([listed]), "t1", {}, 5.0, 0)
     from_async = await poll_estimation_task_async(
-        REQUEST, make_async_sender([listed]), "t1", {}, 5.0, 0)
+        REQUEST, make_async_sender([listed]), "t1", {}, 5.0, 0
+    )
     assert from_sync == from_async == listed
 
 
@@ -184,8 +192,7 @@ MOCKUP_PENDING = {"data": [{"id": "t1", "status": "pending"}]}
 
 async def test_mockup_drivers_return_the_same_completed_task():
     sync_send = make_sender([MOCKUP_PENDING, MOCKUP_DONE], tail=MOCKUP_PENDING)
-    async_send = make_async_sender([MOCKUP_PENDING, MOCKUP_DONE],
-                                   tail=MOCKUP_PENDING)
+    async_send = make_async_sender([MOCKUP_PENDING, MOCKUP_DONE], tail=MOCKUP_PENDING)
 
     from_sync = poll_mockup_task(REQUEST, sync_send, "t1", 5.0, 0)
     from_async = await poll_mockup_task_async(REQUEST, async_send, "t1", 5.0, 0)
@@ -195,11 +202,10 @@ async def test_mockup_drivers_return_the_same_completed_task():
 
 
 async def test_mockup_drivers_report_the_same_failure():
-    sync_error = raised(poll_mockup_task, REQUEST,
-                        make_sender([MOCKUP_FAILED]), "t1", 5.0, 0)
-    async_error = await raised_async(poll_mockup_task_async, REQUEST,
-                                     make_async_sender([MOCKUP_FAILED]),
-                                     "t1", 5.0, 0)
+    sync_error = raised(poll_mockup_task, REQUEST, make_sender([MOCKUP_FAILED]), "t1", 5.0, 0)
+    async_error = await raised_async(
+        poll_mockup_task_async, REQUEST, make_async_sender([MOCKUP_FAILED]), "t1", 5.0, 0
+    )
 
     assert sync_error.message == async_error.message
     assert sync_error.detail == async_error.detail == MOCKUP_FAILED["data"][0]
@@ -207,8 +213,9 @@ async def test_mockup_drivers_report_the_same_failure():
 
 
 def test_mockup_failure_says_so_when_printful_gives_no_reason():
-    error = raised(poll_mockup_task, REQUEST,
-                   make_sender([{"data": [{"status": "failed"}]}]), "t1", 5.0, 0)
+    error = raised(
+        poll_mockup_task, REQUEST, make_sender([{"data": [{"status": "failed"}]}]), "t1", 5.0, 0
+    )
     assert error.message == "Mockup task t1 failed: no reason given"
 
 
@@ -217,34 +224,44 @@ HINT = "Re-check with: mockup status t7"
 
 async def test_mockup_drivers_report_the_same_timeout_with_the_recovery_hint():
     """The hint is the only way a user recovers a task the CLI stopped watching."""
-    sync_error = raised(poll_mockup_task, REQUEST,
-                        make_sender([], tail=MOCKUP_PENDING), "t7", 0.01, 0, HINT)
+    sync_error = raised(
+        poll_mockup_task, REQUEST, make_sender([], tail=MOCKUP_PENDING), "t7", 0.01, 0, HINT
+    )
     async_error = await raised_async(
-        poll_mockup_task_async, REQUEST,
-        make_async_sender([], tail=MOCKUP_PENDING), "t7", 0.01, 0, HINT)
+        poll_mockup_task_async,
+        REQUEST,
+        make_async_sender([], tail=MOCKUP_PENDING),
+        "t7",
+        0.01,
+        0,
+        HINT,
+    )
 
     assert sync_error.message == async_error.message
     assert sync_error.detail == async_error.detail
-    assert sync_error.message == ("Mockup task t7 still pending after 0.01s. "
-                                  "Re-check with: mockup status t7")
+    assert sync_error.message == (
+        "Mockup task t7 still pending after 0.01s. Re-check with: mockup status t7"
+    )
     assert sync_error.detail == {"task_id": "t7", "last_response": MOCKUP_PENDING}
 
 
 async def test_mockup_timeout_without_a_hint_does_not_trail_a_space():
     """A caller with no recovery advice gets a sentence, not a sentence plus room."""
-    sync_error = raised(poll_mockup_task, REQUEST,
-                        make_sender([], tail=MOCKUP_PENDING), "t7", 0.01, 0)
+    sync_error = raised(
+        poll_mockup_task, REQUEST, make_sender([], tail=MOCKUP_PENDING), "t7", 0.01, 0
+    )
     async_error = await raised_async(
-        poll_mockup_task_async, REQUEST,
-        make_async_sender([], tail=MOCKUP_PENDING), "t7", 0.01, 0)
+        poll_mockup_task_async, REQUEST, make_async_sender([], tail=MOCKUP_PENDING), "t7", 0.01, 0
+    )
 
     assert sync_error.message == async_error.message
     assert sync_error.message == "Mockup task t7 still pending after 0.01s."
 
 
 def test_mockup_timeout_joins_the_hint_with_exactly_one_space():
-    error = raised(poll_mockup_task, REQUEST,
-                   make_sender([], tail=MOCKUP_PENDING), "t7", 0.01, 0, "Do X.")
+    error = raised(
+        poll_mockup_task, REQUEST, make_sender([], tail=MOCKUP_PENDING), "t7", 0.01, 0, "Do X."
+    )
     assert error.message == "Mockup task t7 still pending after 0.01s. Do X."
 
 
@@ -259,8 +276,9 @@ def test_the_core_names_no_cli_command():
 
 async def test_mockup_timeout_before_the_first_reread_has_no_response_to_show():
     sync_error = raised(poll_mockup_task, REQUEST, make_sender([]), "t7", 0, 0)
-    async_error = await raised_async(poll_mockup_task_async, REQUEST,
-                                     make_async_sender([]), "t7", 0, 0)
+    async_error = await raised_async(
+        poll_mockup_task_async, REQUEST, make_async_sender([]), "t7", 0, 0
+    )
 
     assert sync_error.detail == async_error.detail
     assert sync_error.detail == {"task_id": "t7", "last_response": {}}

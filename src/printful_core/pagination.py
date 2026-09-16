@@ -9,6 +9,7 @@ Every decision lives in a pure function that neither sleeps nor sends, so the
 synchronous CLI and the asynchronous MCP server share the arithmetic rather
 than each owning a copy of it. The two drivers below are loops and nothing else.
 """
+
 from __future__ import annotations
 
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Sequence
@@ -27,8 +28,9 @@ def first_page_request(request: Request) -> Request:
     return request.with_params(limit=PAGE_LIMIT, offset=0)
 
 
-def next_page_request(request: Request,
-                      pages_so_far: Sequence[Dict[str, Any]]) -> Optional[Request]:
+def next_page_request(
+    request: Request, pages_so_far: Sequence[Dict[str, Any]]
+) -> Optional[Request]:
     """The call that follows `pages_so_far`, or None when the walk is done.
 
     Offset advances by the rows actually accumulated, never by the requested
@@ -67,13 +69,11 @@ def merge_pages(pages: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
     limit = paging.get("limit") or PAGE_LIMIT
     merged = dict(first)
     merged["data"] = rows
-    merged["paging"] = {"total": total, "limit": limit, "offset": 0,
-                        "returned": len(rows)}
+    merged["paging"] = {"total": total, "limit": limit, "offset": 0, "returned": len(rows)}
     return merged
 
 
-def collect_pages(request: Request,
-                  send: Callable[[Request], Dict[str, Any]]) -> Dict[str, Any]:
+def collect_pages(request: Request, send: Callable[[Request], Dict[str, Any]]) -> Dict[str, Any]:
     """Send `request` and every following page, merging their rows."""
     pages = [send(first_page_request(request))]
     while True:
@@ -84,8 +84,8 @@ def collect_pages(request: Request,
 
 
 async def collect_pages_async(
-        request: Request,
-        send: Callable[[Request], Awaitable[Dict[str, Any]]]) -> Dict[str, Any]:
+    request: Request, send: Callable[[Request], Awaitable[Dict[str, Any]]]
+) -> Dict[str, Any]:
     """`collect_pages` over an awaitable sender. Used by the MCP server."""
     pages = [await send(first_page_request(request))]
     while True:

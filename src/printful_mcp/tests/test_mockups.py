@@ -1,4 +1,5 @@
 """The mockups adapter."""
+
 from printful_mcp.models.inputs import (
     CreateMockupTaskInput,
     GetMockupTaskInput,
@@ -9,8 +10,11 @@ from printful_mcp.tools import mockups
 
 
 def _create(**over):
-    base = dict(product_id=71, variant_ids="4011,4012",
-                design_url="https://example.com/art.png")
+    base = {
+        "product_id": 71,
+        "variant_ids": "4011,4012",
+        "design_url": "https://example.com/art.png",
+    }
     base.update(over)
     return CreateMockupTaskInput(**base)
 
@@ -75,16 +79,21 @@ async def test_templates_are_fetched_per_product_and_rendered(transport):
     `.get()`, so a broken renderer would not raise on a sparse response body —
     only an assertion on an actual rendered value catches it.
     """
-    transport._responses.append({"data": [{
-        "id": 5,
-        "placement": "front",
-        "technique": "dtg",
-        "print_area_width": 1800,
-        "print_area_height": 2400,
-        "image_url": "https://example.com/template.png",
-    }]})
-    out = await mockups.list_mockup_templates(
-        transport, ListMockupTemplatesInput(product_id=71))
+    transport._responses.append(
+        {
+            "data": [
+                {
+                    "id": 5,
+                    "placement": "front",
+                    "technique": "dtg",
+                    "print_area_width": 1800,
+                    "print_area_height": 2400,
+                    "image_url": "https://example.com/template.png",
+                }
+            ]
+        }
+    )
+    out = await mockups.list_mockup_templates(transport, ListMockupTemplatesInput(product_id=71))
     assert transport.last.path == "/catalog-products/71/mockup-templates"
     assert "1800x2400" in out
 

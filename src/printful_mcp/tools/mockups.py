@@ -20,8 +20,7 @@ def _ids(raw: str) -> list:
     return [int(v.strip()) for v in raw.split(",") if v.strip()]
 
 
-async def create_mockup_task(transport: AsyncTransport,
-                             params: CreateMockupTaskInput) -> str:
+async def create_mockup_task(transport: AsyncTransport, params: CreateMockupTaskInput) -> str:
     """
     Create a mockup generation task.
 
@@ -40,17 +39,24 @@ async def create_mockup_task(transport: AsyncTransport,
 
     try:
         request = mockups.create_task(
-            params.product_id, variant_ids, params.design_url,
-            placement=params.placement, technique=params.technique,
-            style_ids=style_ids, image_format=params.format)
+            params.product_id,
+            variant_ids,
+            params.design_url,
+            placement=params.placement,
+            technique=params.technique,
+            style_ids=style_ids,
+            image_format=params.format,
+        )
         data = await transport.send(request)
         body = polling.task_body(data)
         if not body:
             return json.dumps(data, indent=2)
-        return (f"Mockup task created!\n\nTask ID: {body['id']}\n"
-                f"Status: {body['status']}\n\n"
-                "Use printful_get_mockup_task with this ID to check status and "
-                "get mockup URLs.")
+        return (
+            f"Mockup task created!\n\nTask ID: {body['id']}\n"
+            f"Status: {body['status']}\n\n"
+            "Use printful_get_mockup_task with this ID to check status and "
+            "get mockup URLs."
+        )
     except ValueError as e:
         return f"Error: {e}"
     except PrintfulError as e:
@@ -76,8 +82,7 @@ async def get_mockup_task(transport: AsyncTransport, params: GetMockupTaskInput)
         return f"Error: {e.message}"
 
 
-async def list_mockup_styles(transport: AsyncTransport,
-                             params: ListMockupStylesInput) -> str:
+async def list_mockup_styles(transport: AsyncTransport, params: ListMockupStylesInput) -> str:
     """
     List the mockup styles available for a catalog product.
 
@@ -92,8 +97,7 @@ async def list_mockup_styles(transport: AsyncTransport,
         return f"Error: {e.message}"
 
 
-async def list_mockup_templates(transport: AsyncTransport,
-                                params: ListMockupTemplatesInput) -> str:
+async def list_mockup_templates(transport: AsyncTransport, params: ListMockupTemplatesInput) -> str:
     """
     List the print-area templates for a catalog product.
 

@@ -13,6 +13,7 @@ is covered without anyone having to remember this file. A tool whose input
 model cannot be built from `_SAMPLES` fails loudly naming itself rather than
 disappearing from the run.
 """
+
 import ast
 import importlib
 import pathlib
@@ -68,8 +69,9 @@ class _EmptyBodyTransport:
     def __init__(self) -> None:
         self.sent = []
 
-    async def send(self, request: Request,
-                   extra_headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+    async def send(
+        self, request: Request, extra_headers: Optional[Dict[str, str]] = None
+    ) -> Dict[str, Any]:
         self.sent.append(request)
         return {}
 
@@ -99,8 +101,11 @@ def _registrations() -> Dict[str, tuple]:
             if not isinstance(call, ast.Call):
                 continue
             fn = call.func
-            if (isinstance(fn, ast.Attribute) and isinstance(fn.value, ast.Name)
-                    and fn.value.id in _TOOL_MODULES):
+            if (
+                isinstance(fn, ast.Attribute)
+                and isinstance(fn.value, ast.Name)
+                and fn.value.id in _TOOL_MODULES
+            ):
                 found[name] = (fn.value.id, fn.attr)
     return found
 
@@ -129,8 +134,8 @@ def _minimal_params(model, tool_name: str):
 def test_the_registration_scan_found_the_whole_surface():
     """A scan that silently matched nothing would make every case below vacuous."""
     assert len(REGISTERED) >= 30, (
-        f"read only {len(REGISTERED)} registrations out of server.py: "
-        f"{sorted(REGISTERED)}")
+        f"read only {len(REGISTERED)} registrations out of server.py: {sorted(REGISTERED)}"
+    )
 
 
 @pytest.mark.parametrize("tool_name", sorted(REGISTERED))
@@ -144,8 +149,7 @@ async def test_an_empty_success_body_is_reported_not_raised(tool_name):
         pytest.skip(SKIP[tool_name])
 
     module_name, func_name = REGISTERED[tool_name]
-    func = getattr(importlib.import_module(f"printful_mcp.tools.{module_name}"),
-                   func_name)
+    func = getattr(importlib.import_module(f"printful_mcp.tools.{module_name}"), func_name)
     transport = _EmptyBodyTransport()
 
     args = [transport]
@@ -155,12 +159,11 @@ async def test_an_empty_success_body_is_reported_not_raised(tool_name):
 
     try:
         result = await func(*args)
-    except Exception as exc:
-        pytest.fail(f"{tool_name} raised {type(exc).__name__}: {exc} "
-                    "on an empty 2xx body")
+    except Exception as exc:  # noqa: BLE001 - must catch any escape to report it via pytest.fail
+        pytest.fail(f"{tool_name} raised {type(exc).__name__}: {exc} on an empty 2xx body")
 
-    assert isinstance(result, str), (
-        f"{tool_name} returned {type(result).__name__}, not str")
+    assert isinstance(result, str), f"{tool_name} returned {type(result).__name__}, not str"
     assert transport.sent, (
         f"{tool_name} returned before sending anything, so nothing rendered the "
-        "empty body. Fix this test's sample input, not the tool.")
+        "empty body. Fix this test's sample input, not the tool."
+    )

@@ -2,11 +2,26 @@ import pytest
 
 from printful_core.endpoints import orders
 
-ITEM = {"source": "catalog", "catalog_variant_id": 4012, "quantity": 1,
-        "placements": [{"placement": "front", "technique": "dtg",
-                        "layers": [{"type": "file", "url": "https://x/a.png"}]}]}
-RECIPIENT = {"name": "Jane", "address1": "1 St", "city": "Charlotte",
-             "state_code": "NC", "country_code": "US", "zip": "28273"}
+ITEM = {
+    "source": "catalog",
+    "catalog_variant_id": 4012,
+    "quantity": 1,
+    "placements": [
+        {
+            "placement": "front",
+            "technique": "dtg",
+            "layers": [{"type": "file", "url": "https://x/a.png"}],
+        }
+    ],
+}
+RECIPIENT = {
+    "name": "Jane",
+    "address1": "1 St",
+    "city": "Charlotte",
+    "state_code": "NC",
+    "country_code": "US",
+    "zip": "28273",
+}
 
 
 def test_list_orders_path():
@@ -38,8 +53,9 @@ def test_create_order_rejects_empty_items():
 def test_create_order_rejects_catalog_item_without_placements():
     """Live API: 'Property `placements` is required'."""
     with pytest.raises(ValueError, match="placements"):
-        orders.create_order(RECIPIENT, [{"source": "catalog",
-                                         "catalog_variant_id": 1, "quantity": 1}])
+        orders.create_order(
+            RECIPIENT, [{"source": "catalog", "catalog_variant_id": 1, "quantity": 1}]
+        )
 
 
 def test_non_catalog_item_needs_no_placements():

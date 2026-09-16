@@ -4,6 +4,7 @@ Mockup creation is the most tightly limited part of the API: 10 requests/60s
 for established stores, 2/60s for new stores, a 60-second lockout on exceeding
 it, and 20,000 generated files per account per 24 hours.
 """
+
 from __future__ import annotations
 
 from typing import List, Optional
@@ -16,10 +17,15 @@ RATE_LIMIT_NOTE = (
 )
 
 
-def create_task(product_id: int, variant_ids: List[int], image_url: str,
-                placement: str = "front", technique: str = "dtg",
-                style_ids: Optional[List[int]] = None,
-                image_format: str = "jpg") -> Request:
+def create_task(
+    product_id: int,
+    variant_ids: List[int],
+    image_url: str,
+    placement: str = "front",
+    technique: str = "dtg",
+    style_ids: Optional[List[int]] = None,
+    image_format: str = "jpg",
+) -> Request:
     if not variant_ids:
         raise ValueError("At least one catalog variant ID is required.")
     if not image_url:
@@ -30,17 +36,18 @@ def create_task(product_id: int, variant_ids: List[int], image_url: str,
         "catalog_product_id": int(product_id),
         "catalog_variant_ids": [int(v) for v in variant_ids],
         "orientation": "any",
-        "placements": [{
-            "placement": placement,
-            "technique": technique,
-            "layers": [{"type": "file", "url": image_url}],
-        }],
+        "placements": [
+            {
+                "placement": placement,
+                "technique": technique,
+                "layers": [{"type": "file", "url": image_url}],
+            }
+        ],
     }
     if style_ids:
         product["mockup_style_ids"] = [int(s) for s in style_ids]
 
-    return Request("POST", "/mockup-tasks",
-                   json={"format": image_format, "products": [product]})
+    return Request("POST", "/mockup-tasks", json={"format": image_format, "products": [product]})
 
 
 def get_task(task_id: str) -> Request:

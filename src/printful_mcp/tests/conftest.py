@@ -4,6 +4,7 @@ An MCP tool is a thin adapter: validate input, build a Request, send it, format
 the reply. The thing worth asserting is which Request came out, so this records
 them and replays canned responses rather than simulating the API.
 """
+
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
@@ -20,8 +21,9 @@ class FakeTransport:
         self.sent: List[Request] = []
         self._responses = list(responses or [])
 
-    async def send(self, request: Request,
-                   extra_headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+    async def send(
+        self, request: Request, extra_headers: Optional[Dict[str, str]] = None
+    ) -> Dict[str, Any]:
         self.sent.append(request)
         if not self._responses:
             return {"data": {}}

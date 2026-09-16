@@ -16,8 +16,8 @@ from ..models.inputs import (
     GetEstimationTaskInput,
     GetOrderInput,
     ListOrderItemsInput,
-    ListOrdersInput,
     ListOrderShipmentsInput,
+    ListOrdersInput,
     UpdateOrderInput,
 )
 
@@ -55,8 +55,10 @@ async def create_order(transport: AsyncTransport, params: CreateOrderInput) -> s
     if not isinstance(items, list) or not items:
         return "Error: items_json must be a non-empty JSON array of order items."
     if not all(isinstance(item, dict) for item in items):
-        return ("Error: every entry in items_json must be a JSON object, "
-                'e.g. [{"catalog_variant_id": 4012, "quantity": 1}].')
+        return (
+            "Error: every entry in items_json must be a JSON object, "
+            'e.g. [{"catalog_variant_id": 4012, "quantity": 1}].'
+        )
 
     try:
         request = orders.create_order(recipient, items, external_id=params.external_id)
@@ -102,8 +104,10 @@ async def confirm_order(transport: AsyncTransport, params: ConfirmOrderInput) ->
         if params.format == "json":
             return json.dumps(data, indent=2)
         body = data.get("data", {})
-        return (f"✓ Order {body.get('id', params.order_id)} confirmed successfully!"
-                "\n\n" + markdown.order(body))
+        return (
+            f"✓ Order {body.get('id', params.order_id)} confirmed successfully!"
+            "\n\n" + markdown.order(body)
+        )
     except PrintfulError as e:
         return f"Error: {e.message}"
 
@@ -116,8 +120,7 @@ async def list_orders(transport: AsyncTransport, params: ListOrdersInput) -> str
     to find drafts awaiting confirmation.
     """
     try:
-        request = orders.list_orders(
-            limit=params.limit, offset=params.offset, status=params.status)
+        request = orders.list_orders(limit=params.limit, offset=params.offset, status=params.status)
         data = await transport.send(request)
         if params.format == "json":
             return json.dumps(data, indent=2)
@@ -180,8 +183,7 @@ async def list_order_items(transport: AsyncTransport, params: ListOrderItemsInpu
         return f"Error: {e.message}"
 
 
-async def list_order_shipments(transport: AsyncTransport,
-                               params: ListOrderShipmentsInput) -> str:
+async def list_order_shipments(transport: AsyncTransport, params: ListOrderShipmentsInput) -> str:
     """
     List the shipments for an order, with tracking numbers.
     """
@@ -194,8 +196,9 @@ async def list_order_shipments(transport: AsyncTransport,
         return f"Error: {e.message}"
 
 
-async def create_estimation_task(transport: AsyncTransport,
-                                 params: CreateEstimationTaskInput) -> str:
+async def create_estimation_task(
+    transport: AsyncTransport, params: CreateEstimationTaskInput
+) -> str:
     """
     Start a cost estimate for a would-be order.
 
@@ -217,8 +220,10 @@ async def create_estimation_task(transport: AsyncTransport,
     if not isinstance(items, list) or not items:
         return "Error: items_json must be a non-empty JSON array of order items."
     if not all(isinstance(item, dict) for item in items):
-        return ("Error: every entry in items_json must be a JSON object, "
-                'e.g. [{"catalog_variant_id": 4012, "quantity": 1}].')
+        return (
+            "Error: every entry in items_json must be a JSON object, "
+            'e.g. [{"catalog_variant_id": 4012, "quantity": 1}].'
+        )
 
     try:
         request = orders.create_estimation_task(recipient, items)
@@ -226,17 +231,18 @@ async def create_estimation_task(transport: AsyncTransport,
         if params.format == "json":
             return json.dumps(data, indent=2)
         body = polling.task_body(data)
-        return (f"Estimation task created.\n\nTask ID: {body.get('id')}\n"
-                f"Status: {body.get('status')}\n\n"
-                "Read the result with printful_get_estimation_task.")
+        return (
+            f"Estimation task created.\n\nTask ID: {body.get('id')}\n"
+            f"Status: {body.get('status')}\n\n"
+            "Read the result with printful_get_estimation_task."
+        )
     except ValueError as e:
         return f"Error: {e}"
     except PrintfulError as e:
         return f"Error: {e.message}"
 
 
-async def get_estimation_task(transport: AsyncTransport,
-                              params: GetEstimationTaskInput) -> str:
+async def get_estimation_task(transport: AsyncTransport, params: GetEstimationTaskInput) -> str:
     """
     Read a cost estimate started by printful_create_estimation_task.
 

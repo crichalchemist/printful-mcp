@@ -38,8 +38,12 @@ async def get_store_statistics(transport: AsyncTransport, params: GetStoreStatsI
     """
     try:
         request = stores.get_statistics(
-            params.store_id, params.date_from, params.date_to,
-            report_types=params.report_types, currency=params.currency)
+            params.store_id,
+            params.date_from,
+            params.date_to,
+            report_types=params.report_types,
+            currency=params.currency,
+        )
         data = await transport.send(request)
         if params.format == "json":
             return json.dumps(data, indent=2)
@@ -48,8 +52,7 @@ async def get_store_statistics(transport: AsyncTransport, params: GetStoreStatsI
         return f"Error: {e.message}"
 
 
-async def list_store_templates(transport: AsyncTransport,
-                               params: ListStoreTemplatesInput) -> str:
+async def list_store_templates(transport: AsyncTransport, params: ListStoreTemplatesInput) -> str:
     """
     List the store's saved product templates.
 

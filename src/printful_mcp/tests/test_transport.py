@@ -1,4 +1,5 @@
 """The server's transport lifecycle."""
+
 import pytest
 
 from printful_core import auth
@@ -16,7 +17,7 @@ def test_one_transport_serves_every_tool(monkeypatch):
     global rather than built where it is used.
     """
     monkeypatch.setenv("PRINTFUL_API_KEY", "key-for-tests-only")
-    monkeypatch.setattr(auth, "load_config", lambda: {})
+    monkeypatch.setattr(auth, "load_config", dict)
     monkeypatch.setattr(mcp_transport, "_transport", None)
 
     first = mcp_transport.get_transport()
@@ -34,7 +35,7 @@ def test_missing_credentials_raise_rather_than_build_a_useless_transport(monkeyp
     first, which reads like that tool being broken.
     """
     monkeypatch.delenv("PRINTFUL_API_KEY", raising=False)
-    monkeypatch.setattr(auth, "load_config", lambda: {})
+    monkeypatch.setattr(auth, "load_config", dict)
     monkeypatch.setattr(mcp_transport, "_transport", None)
 
     with pytest.raises(PrintfulAuthError):

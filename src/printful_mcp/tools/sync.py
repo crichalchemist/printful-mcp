@@ -14,6 +14,7 @@ from printful_core.transport import AsyncTransport
 # v1 Sync Product Models
 class ListSyncProductsInput(BaseModel):
     """Input for listing sync products (v1 only)."""
+
     limit: Optional[int] = Field(default=20, ge=1, le=100, description="Number of results per page")
     offset: Optional[int] = Field(default=0, ge=0, description="Number of results to skip")
     format: Literal["markdown", "json"] = Field(default="markdown", description="Output format")
@@ -21,6 +22,7 @@ class ListSyncProductsInput(BaseModel):
 
 class GetSyncProductInput(BaseModel):
     """Input for getting sync product (v1 only)."""
+
     sync_product_id: int = Field(..., description="Sync product ID")
     format: Literal["markdown", "json"] = Field(default="markdown", description="Output format")
 

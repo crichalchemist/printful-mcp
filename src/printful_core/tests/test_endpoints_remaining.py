@@ -38,8 +38,7 @@ class TestFiles:
         req = files.add_file("https://x/a.png", filename="a.png")
         assert req.method == "POST"
         assert req.path == "/files"
-        assert req.json == {"url": "https://x/a.png", "visible": True,
-                            "filename": "a.png"}
+        assert req.json == {"url": "https://x/a.png", "visible": True, "filename": "a.png"}
 
     def test_add_file_rejects_empty_url(self):
         with pytest.raises(ValueError, match="URL is required"):

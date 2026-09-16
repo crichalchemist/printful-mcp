@@ -6,6 +6,7 @@ Mockup generation is the most tightly rate-limited part of the Printful API:
 The transport surfaces 429 rather than retrying, so callers see the limit instead
 of being walked into a lockout.
 """
+
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
@@ -20,29 +21,40 @@ RATE_LIMIT_NOTE = endpoints.RATE_LIMIT_NOTE
 extract_mockup_urls = summary.mockup_urls
 
 
-def create_task(transport: SyncTransport, product_id: int,
-                variant_ids: List[int], image_url: str,
-                placement: str = "front", technique: str = "dtg",
-                mockup_style_ids: Optional[List[int]] = None,
-                image_format: str = "jpg") -> Dict[str, Any]:
+def create_task(
+    transport: SyncTransport,
+    product_id: int,
+    variant_ids: List[int],
+    image_url: str,
+    placement: str = "front",
+    technique: str = "dtg",
+    mockup_style_ids: Optional[List[int]] = None,
+    image_format: str = "jpg",
+) -> Dict[str, Any]:
     """Create an async mockup generation task."""
-    return transport.send(endpoints.create_task(
-        product_id, variant_ids, image_url, placement, technique,
-        mockup_style_ids, image_format))
+    return transport.send(
+        endpoints.create_task(
+            product_id, variant_ids, image_url, placement, technique, mockup_style_ids, image_format
+        )
+    )
 
 
 def get_task(transport: SyncTransport, task_id: str) -> Dict[str, Any]:
     return transport.send(endpoints.get_task(task_id))
 
 
-def wait_for_task(transport: SyncTransport, task_id: str,
-                  max_wait: float = 120.0,
-                  interval: float = 5.0) -> Dict[str, Any]:
+def wait_for_task(
+    transport: SyncTransport, task_id: str, max_wait: float = 120.0, interval: float = 5.0
+) -> Dict[str, Any]:
     """Poll a mockup task until it completes or fails."""
     return polling.poll_mockup_task(
-        endpoints.get_task(task_id), transport.send, task_id,
-        max_wait, interval,
-        recovery_hint=f"Re-check with: mockup status {task_id}")
+        endpoints.get_task(task_id),
+        transport.send,
+        task_id,
+        max_wait,
+        interval,
+        recovery_hint=f"Re-check with: mockup status {task_id}",
+    )
 
 
 def list_styles(transport: SyncTransport, product_id: int) -> Dict[str, Any]:

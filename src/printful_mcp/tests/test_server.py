@@ -10,6 +10,7 @@ can reach, through exactly one registered tool.
 `mcp.list_tools()` is a coroutine returning `list[Tool]`. Both were confirmed
 against the installed `mcp` version.
 """
+
 import ast
 import pathlib
 
@@ -57,9 +58,11 @@ def _builders_bound_by_tools() -> set:
             if not isinstance(node, ast.Call):
                 continue
             fn = node.func
-            if (isinstance(fn, ast.Attribute)
-                    and isinstance(fn.value, ast.Name)
-                    and fn.value.id in ENDPOINT_MODULES):
+            if (
+                isinstance(fn, ast.Attribute)
+                and isinstance(fn.value, ast.Name)
+                and fn.value.id in ENDPOINT_MODULES
+            ):
                 bound.add(f"{fn.value.id}.{fn.attr}")
     return bound
 
@@ -91,9 +94,11 @@ def _delegate_targets() -> set:
         if not isinstance(node, ast.Call):
             continue
         fn = node.func
-        if (isinstance(fn, ast.Attribute)
-                and isinstance(fn.value, ast.Name)
-                and fn.value.id in TOOL_MODULES):
+        if (
+            isinstance(fn, ast.Attribute)
+            and isinstance(fn.value, ast.Name)
+            and fn.value.id in TOOL_MODULES
+        ):
             found.add(f"{fn.value.id}.{fn.attr}")
     return found
 
@@ -156,10 +161,11 @@ def test_every_tool_function_is_reachable_through_exactly_one_delegate():
     implemented = _tool_functions()
     delegated = _delegate_targets()
     assert implemented - delegated == set(), (
-        f"no delegate calls these tool functions: {sorted(implemented - delegated)}")
+        f"no delegate calls these tool functions: {sorted(implemented - delegated)}"
+    )
     assert delegated - implemented == set(), (
-        f"server.py delegates to functions that do not exist: "
-        f"{sorted(delegated - implemented)}")
+        f"server.py delegates to functions that do not exist: {sorted(delegated - implemented)}"
+    )
 
 
 def _registered_tool_names() -> list:
@@ -202,9 +208,16 @@ async def test_every_tool_is_namespaced():
     assert all(tool.name.startswith("printful_") for tool in await _tools())
 
 
-@pytest.mark.parametrize("required", [
-    "title", "readOnlyHint", "destructiveHint", "idempotentHint", "openWorldHint",
-])
+@pytest.mark.parametrize(
+    "required",
+    [
+        "title",
+        "readOnlyHint",
+        "destructiveHint",
+        "idempotentHint",
+        "openWorldHint",
+    ],
+)
 async def test_every_tool_declares_the_full_annotation_set(required):
     """An MCP client reads these to decide whether to ask a human first.
 
@@ -226,6 +239,7 @@ async def test_the_tools_that_spend_money_are_marked_destructive():
     """
     by_name = {tool.name: tool for tool in await _tools()}
     for name in ("printful_confirm_order", "printful_cancel_order"):
-        assert by_name[name].annotations.destructiveHint is True, \
+        assert by_name[name].annotations.destructiveHint is True, (
             f"{name} is destructive and must say so"
+        )
         assert by_name[name].annotations.readOnlyHint is False

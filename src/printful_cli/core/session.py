@@ -4,8 +4,10 @@ There is no Printful project file, so the persistent state this harness carries 
 the draft order under construction, the selected store, the file IDs added during
 the session, and the command history.
 """
+
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 from datetime import datetime
@@ -25,12 +27,12 @@ def _locked_save_json(path: str, data: Any, **dump_kwargs) -> None:
     Chmod 0600 to match the config file it now sits beside: the session holds
     the recipient block — name, address, email, phone.
     """
-    try:
-        f = open(path, "r+")
-    except FileNotFoundError:
-        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-        f = open(path, "w")
-    with f:
+    with contextlib.ExitStack() as stack:
+        try:
+            f = stack.enter_context(open(path, "r+"))
+        except FileNotFoundError:
+            os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+            f = stack.enter_context(open(path, "w"))
         locked = False
         try:
             import fcntl
@@ -49,10 +51,8 @@ def _locked_save_json(path: str, data: Any, **dump_kwargs) -> None:
                 import fcntl
 
                 fcntl.flock(f.fileno(), fcntl.LOCK_UN)
-    try:
+    with contextlib.suppress(OSError):
         os.chmod(path, 0o600)
-    except OSError:
-        pass
 
 
 class DraftOrder:
@@ -176,9 +176,7 @@ class DraftOrder:
         """Build the POST /v2/orders request body."""
         missing = self.missing_fields()
         if missing:
-            raise ValueError(
-                "Draft order is incomplete. Missing: " + ", ".join(missing)
-            )
+            raise ValueError("Draft order is incomplete. Missing: " + ", ".join(missing))
         payload: Dict[str, Any] = {
             "recipient": dict(self.recipient),
             "order_items": list(self.items),
@@ -205,7 +203,8 @@ class DraftOrder:
             "item_count": len(self.items),
             "total_quantity": sum(i.get("quantity", 0) for i in self.items),
             "items_without_design": sum(
-                1 for i in self.items
+                1
+                for i in self.items
                 if i.get("source", "catalog") == "catalog" and not i.get("placements")
             ),
             "priceable": self.priceable(),
@@ -269,7 +268,9 @@ class PrintfulSession:
             "id": file_id,
             "url": url,
             "filename": filename,
-            "added_at": datetime.now().isoformat(timespec="seconds"),
+            # Local wall-clock, shown to the user by `files list`; a tz-aware value
+            # would change what that command prints, which this task must not do.
+            "added_at": datetime.now().isoformat(timespec="seconds"),  # noqa: DTZ005
         }
         self.files.append(record)
         self.touch()
@@ -280,7 +281,10 @@ class PrintfulSession:
             {
                 "command": command,
                 "result": result or {},
-                "timestamp": datetime.now().isoformat(timespec="seconds"),
+                # Local wall-clock, shown to the user by `session history`; a
+                # tz-aware value would change what that command prints, which
+                # this task must not do.
+                "timestamp": datetime.now().isoformat(timespec="seconds"),  # noqa: DTZ005
             }
         )
         if len(self.history) > MAX_HISTORY:

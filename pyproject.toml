@@ -79,6 +79,18 @@ markers = [
 ]
 asyncio_mode = "auto"
 
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "B", "SIM", "DTZ", "C4", "PIE", "ISC", "BLE", "RUF"]
+# F541 flags `f""`. Sixty-seven of the seventy-five are markdown.py's blank-line
+# idiom inside lists of f-strings, where the prefix keeps a column aligned. The
+# rule is correct and the code is deliberate, so the rule is off rather than the
+# code changed.
+ignore = ["F541"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 

@@ -25,9 +25,10 @@ class TestExtractMessage:
         learns nothing actionable. The real API sends both on every validation
         failure, so the ordering -- not either key alone -- is what matters.
         """
-        assert extract_message(
-            {"detail": "Bad variant id 999", "title": "Invalid request"}
-        ) == "Bad variant id 999"
+        assert (
+            extract_message({"detail": "Bad variant id 999", "title": "Invalid request"})
+            == "Bad variant id 999"
+        )
 
     def test_rfc9457_title_fallback(self):
         assert extract_message({"title": "Invalid"}) == "Invalid"

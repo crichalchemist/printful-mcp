@@ -2,43 +2,44 @@
 
 import os
 import sys
-from mcp.server.fastmcp import FastMCP
-from dotenv import load_dotenv
 
-from .transport import get_transport
+from dotenv import load_dotenv
+from mcp.server.fastmcp import FastMCP
+
 from .models.inputs import (
-    ListCatalogProductsInput,
-    GetProductInput,
-    GetProductVariantsInput,
-    GetVariantPricesInput,
-    GetProductAvailabilityInput,
-    GetCategoryInput,
-    GetSizeGuideInput,
-    ListCategoriesInput,
-    CreateOrderInput,
-    GetOrderInput,
-    ConfirmOrderInput,
-    ListOrdersInput,
-    UpdateOrderInput,
-    CancelOrderInput,
-    ListOrderItemsInput,
-    ListOrderShipmentsInput,
-    CreateEstimationTaskInput,
-    GetEstimationTaskInput,
+    AddFileInput,
     CalculateShippingInput,
     CalculateTaxInput,
+    CancelOrderInput,
+    ConfirmOrderInput,
+    CreateEstimationTaskInput,
     CreateMockupTaskInput,
+    CreateOrderInput,
+    GetCategoryInput,
+    GetEstimationTaskInput,
+    GetFileInput,
     GetMockupTaskInput,
+    GetOrderInput,
+    GetProductAvailabilityInput,
+    GetProductInput,
+    GetProductVariantsInput,
+    GetSizeGuideInput,
+    GetStoreStatsInput,
+    GetVariantPricesInput,
+    ListCatalogProductsInput,
+    ListCategoriesInput,
     ListMockupStylesInput,
     ListMockupTemplatesInput,
-    AddFileInput,
-    GetFileInput,
+    ListOrderItemsInput,
+    ListOrderShipmentsInput,
+    ListOrdersInput,
     ListStoresInput,
-    GetStoreStatsInput,
     ListStoreTemplatesInput,
+    UpdateOrderInput,
 )
-from .tools import catalog, orders, shipping, mockups, files, stores, sync
-from .tools.sync import ListSyncProductsInput, GetSyncProductInput
+from .tools import catalog, files, mockups, orders, shipping, stores, sync
+from .tools.sync import GetSyncProductInput, ListSyncProductsInput
+from .transport import get_transport
 
 # Load environment variables
 load_dotenv()
@@ -49,6 +50,7 @@ mcp = FastMCP("printful_mcp")
 
 # ========== CATALOG TOOLS ==========
 
+
 @mcp.tool(
     name="printful_list_catalog_products",
     annotations={
@@ -57,12 +59,12 @@ mcp = FastMCP("printful_mcp")
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_list_catalog_products(params: ListCatalogProductsInput) -> str:
     """
     Browse Printful's product catalog with optional filters.
-    
+
     Returns a list of available products including t-shirts, mugs, posters, etc.
     Use filters to narrow down by category, color, technique, or product type.
     """
@@ -77,12 +79,12 @@ async def printful_list_catalog_products(params: ListCatalogProductsInput) -> st
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_get_product(params: GetProductInput) -> str:
     """
     Get detailed information about a specific catalog product.
-    
+
     Returns placements (where designs can be printed), techniques (DTG, embroidery, etc.),
     available sizes/colors, and design requirements.
     """
@@ -97,12 +99,12 @@ async def printful_get_product(params: GetProductInput) -> str:
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_get_product_variants(params: GetProductVariantsInput) -> str:
     """
     Get all variants (size/color combinations) for a product.
-    
+
     Each variant has a unique ID needed for ordering. Returns variant IDs,
     names, sizes, colors, and preview images.
     """
@@ -117,12 +119,12 @@ async def printful_get_product_variants(params: GetProductVariantsInput) -> str:
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_get_variant_prices(params: GetVariantPricesInput) -> str:
     """
     Get pricing information for a specific variant.
-    
+
     Returns base prices by technique, placement costs, and quantity discounts.
     Helps calculate total order costs before ordering.
     """
@@ -137,12 +139,12 @@ async def printful_get_variant_prices(params: GetVariantPricesInput) -> str:
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_get_product_availability(params: GetProductAvailabilityInput) -> str:
     """
     Check stock availability for a product's variants.
-    
+
     Returns in-stock/out-of-stock status for each variant and technique
     by selling region. Critical for displaying product availability.
     """
@@ -157,7 +159,7 @@ async def printful_get_product_availability(params: GetProductAvailabilityInput)
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_list_categories(params: ListCategoriesInput) -> str:
     """
@@ -176,7 +178,7 @@ async def printful_list_categories(params: ListCategoriesInput) -> str:
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_get_category(params: GetCategoryInput) -> str:
     """
@@ -193,7 +195,7 @@ async def printful_get_category(params: GetCategoryInput) -> str:
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_get_size_guide(params: GetSizeGuideInput) -> str:
     """
@@ -204,6 +206,7 @@ async def printful_get_size_guide(params: GetSizeGuideInput) -> str:
 
 # ========== ORDER TOOLS ==========
 
+
 @mcp.tool(
     name="printful_create_order",
     annotations={
@@ -212,7 +215,7 @@ async def printful_get_size_guide(params: GetSizeGuideInput) -> str:
         "destructiveHint": False,
         "idempotentHint": False,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_create_order(params: CreateOrderInput) -> str:
     """
@@ -232,12 +235,12 @@ async def printful_create_order(params: CreateOrderInput) -> str:
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_get_order(params: GetOrderInput) -> str:
     """
     Get details of a specific order.
-    
+
     Returns order status, recipient, costs, items, and shipment info.
     Use order ID or external ID (prefix with @).
     """
@@ -252,7 +255,7 @@ async def printful_get_order(params: GetOrderInput) -> str:
         "destructiveHint": True,
         "idempotentHint": False,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_confirm_order(params: ConfirmOrderInput) -> str:
     """
@@ -272,12 +275,12 @@ async def printful_confirm_order(params: ConfirmOrderInput) -> str:
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_list_orders(params: ListOrdersInput) -> str:
     """
     List all orders from the store.
-    
+
     Returns paginated list of orders with status, costs, and item counts.
     """
     return await orders.list_orders(get_transport(), params)
@@ -291,7 +294,7 @@ async def printful_list_orders(params: ListOrdersInput) -> str:
         "destructiveHint": False,
         "idempotentHint": False,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_update_order(params: UpdateOrderInput) -> str:
     """
@@ -308,7 +311,7 @@ async def printful_update_order(params: UpdateOrderInput) -> str:
         "destructiveHint": True,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_cancel_order(params: CancelOrderInput) -> str:
     """
@@ -326,7 +329,7 @@ async def printful_cancel_order(params: CancelOrderInput) -> str:
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_list_order_items(params: ListOrderItemsInput) -> str:
     """
@@ -343,7 +346,7 @@ async def printful_list_order_items(params: ListOrderItemsInput) -> str:
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_list_order_shipments(params: ListOrderShipmentsInput) -> str:
     """
@@ -360,7 +363,7 @@ async def printful_list_order_shipments(params: ListOrderShipmentsInput) -> str:
         "destructiveHint": False,
         "idempotentHint": False,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_create_estimation_task(params: CreateEstimationTaskInput) -> str:
     """
@@ -378,7 +381,7 @@ async def printful_create_estimation_task(params: CreateEstimationTaskInput) -> 
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_get_estimation_task(params: GetEstimationTaskInput) -> str:
     """
@@ -389,6 +392,7 @@ async def printful_get_estimation_task(params: GetEstimationTaskInput) -> str:
 
 # ========== SHIPPING TOOLS ==========
 
+
 @mcp.tool(
     name="printful_calculate_shipping",
     annotations={
@@ -397,12 +401,12 @@ async def printful_get_estimation_task(params: GetEstimationTaskInput) -> str:
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_calculate_shipping(params: CalculateShippingInput) -> str:
     """
     Calculate shipping rates for an order.
-    
+
     Returns available shipping methods, costs, and estimated delivery times
     based on recipient location and order items.
     """
@@ -417,7 +421,7 @@ async def printful_calculate_shipping(params: CalculateShippingInput) -> str:
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": False,
-    }
+    },
 )
 async def printful_list_countries() -> str:
     """
@@ -437,7 +441,7 @@ async def printful_list_countries() -> str:
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_calculate_tax(params: CalculateTaxInput) -> str:
     """
@@ -448,6 +452,7 @@ async def printful_calculate_tax(params: CalculateTaxInput) -> str:
 
 # ========== MOCKUP TOOLS ==========
 
+
 @mcp.tool(
     name="printful_create_mockup_task",
     annotations={
@@ -456,7 +461,7 @@ async def printful_calculate_tax(params: CalculateTaxInput) -> str:
         "destructiveHint": False,
         "idempotentHint": False,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_create_mockup_task(params: CreateMockupTaskInput) -> str:
     """
@@ -476,7 +481,7 @@ async def printful_create_mockup_task(params: CreateMockupTaskInput) -> str:
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_get_mockup_task(params: GetMockupTaskInput) -> str:
     """
@@ -496,7 +501,7 @@ async def printful_get_mockup_task(params: GetMockupTaskInput) -> str:
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_list_mockup_styles(params: ListMockupStylesInput) -> str:
     """
@@ -514,7 +519,7 @@ async def printful_list_mockup_styles(params: ListMockupStylesInput) -> str:
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_list_mockup_templates(params: ListMockupTemplatesInput) -> str:
     """
@@ -525,6 +530,7 @@ async def printful_list_mockup_templates(params: ListMockupTemplatesInput) -> st
 
 # ========== FILE TOOLS ==========
 
+
 @mcp.tool(
     name="printful_add_file",
     annotations={
@@ -533,12 +539,12 @@ async def printful_list_mockup_templates(params: ListMockupTemplatesInput) -> st
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_add_file(params: AddFileInput) -> str:
     """
     Add a design file to the Printful file library.
-    
+
     Uploads file from URL for reuse across orders. Files are processed
     asynchronously. Returns file ID for use in orders.
     """
@@ -553,12 +559,12 @@ async def printful_add_file(params: AddFileInput) -> str:
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_get_file(params: GetFileInput) -> str:
     """
     Get information about a file in the library.
-    
+
     Returns file status, dimensions, DPI, and URLs. Check processing
     status before using in orders.
     """
@@ -566,6 +572,7 @@ async def printful_get_file(params: GetFileInput) -> str:
 
 
 # ========== STORE TOOLS ==========
+
 
 @mcp.tool(
     name="printful_list_stores",
@@ -575,12 +582,12 @@ async def printful_get_file(params: GetFileInput) -> str:
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": False,
-    }
+    },
 )
 async def printful_list_stores(params: ListStoresInput) -> str:
     """
     List all stores available to your API token.
-    
+
     Returns store IDs and names. Needed for multi-store accounts.
     """
     return await stores.list_stores(get_transport(), params)
@@ -594,12 +601,12 @@ async def printful_list_stores(params: ListStoresInput) -> str:
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_get_store_stats(params: GetStoreStatsInput) -> str:
     """
     Get store statistics for a date range.
-    
+
     Returns sales, costs, profit, order counts, and fulfillment metrics.
     Date range cannot exceed 6 months.
     """
@@ -614,7 +621,7 @@ async def printful_get_store_stats(params: GetStoreStatsInput) -> str:
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_list_store_templates(params: ListStoreTemplatesInput) -> str:
     """
@@ -625,6 +632,7 @@ async def printful_list_store_templates(params: ListStoreTemplatesInput) -> str:
 
 # ========== V1 FALLBACK TOOLS ==========
 
+
 @mcp.tool(
     name="printful_list_sync_products",
     annotations={
@@ -633,12 +641,12 @@ async def printful_list_store_templates(params: ListStoreTemplatesInput) -> str:
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_list_sync_products(params: ListSyncProductsInput) -> str:
     """
     List sync products using v1 API (not available in v2 yet).
-    
+
     Sync products are pre-configured templates with saved designs.
     Currently only available via v1 API.
     """
@@ -653,12 +661,12 @@ async def printful_list_sync_products(params: ListSyncProductsInput) -> str:
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_get_sync_product(params: GetSyncProductInput) -> str:
     """
     Get sync product details using v1 API (not available in v2 yet).
-    
+
     Returns full sync product info including variants and designs.
     Currently only available via v1 API.
     """
@@ -667,7 +675,7 @@ async def printful_get_sync_product(params: GetSyncProductInput) -> str:
 
 def main():
     """Entry point for the MCP server (stdio only, for backwards compatibility).
-    
+
     For full CLI with transport options, use: python -m printful_mcp --help
     """
     # Check for API key
@@ -675,7 +683,7 @@ def main():
         print("Error: PRINTFUL_API_KEY environment variable is required", file=sys.stderr)
         print("Get your API key from: https://www.printful.com/dashboard/api", file=sys.stderr)
         sys.exit(1)
-    
+
     # Run the server with stdio transport (default for Cursor/Claude Desktop)
     mcp.run(transport="stdio")
 

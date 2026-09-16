@@ -4,6 +4,7 @@ httpx ships Client and AsyncClient with matching APIs, so one module serves the
 synchronous CLI and the asynchronous MCP server without duplicating URL
 construction, header handling, or response normalization.
 """
+
 from __future__ import annotations
 
 from typing import Any, Dict, Optional
@@ -33,12 +34,11 @@ def _normalize(request: Request, response) -> Dict[str, Any]:
             return {}
         try:
             body = response.json()
-        except ValueError:
+        except ValueError as exc:
             raise PrintfulError(
-                f"Invalid JSON in response from {_url(request)} "
-                f"(status {response.status_code})",
+                f"Invalid JSON in response from {_url(request)} (status {response.status_code})",
                 status_code=response.status_code,
-            )
+            ) from exc
         if request.version == "v2":
             return body
         # v1 wraps its payload in {"code": ..., "result": ...}
@@ -49,8 +49,7 @@ def _normalize(request: Request, response) -> Dict[str, Any]:
     except ValueError:
         body = response.text
 
-    raise_for_status(response.status_code, body, _url(request),
-                     headers=response.headers)
+    raise_for_status(response.status_code, body, _url(request), headers=response.headers)
 
 
 class SyncTransport:
@@ -60,8 +59,9 @@ class SyncTransport:
         self.credentials = credentials
         self.client = httpx.Client(timeout=timeout)
 
-    def send(self, request: Request,
-             extra_headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+    def send(
+        self, request: Request, extra_headers: Optional[Dict[str, str]] = None
+    ) -> Dict[str, Any]:
         try:
             response = self.client.request(
                 method=request.method,
@@ -70,10 +70,10 @@ class SyncTransport:
                 json=request.json,
                 headers=self.credentials.headers(extra_headers),
             )
-        except httpx.TimeoutException:
-            raise PrintfulError(f"Request to {_url(request)} timed out.")
+        except httpx.TimeoutException as exc:
+            raise PrintfulError(f"Request to {_url(request)} timed out.") from exc
         except httpx.RequestError as exc:
-            raise PrintfulError(f"Request error: {exc}")
+            raise PrintfulError(f"Request error: {exc}") from exc
         return _normalize(request, response)
 
     def close(self) -> None:
@@ -96,8 +96,9 @@ class AsyncTransport:
         self.credentials = credentials
         self.client = httpx.AsyncClient(timeout=timeout)
 
-    async def send(self, request: Request,
-                   extra_headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+    async def send(
+        self, request: Request, extra_headers: Optional[Dict[str, str]] = None
+    ) -> Dict[str, Any]:
         try:
             response = await self.client.request(
                 method=request.method,
@@ -106,10 +107,10 @@ class AsyncTransport:
                 json=request.json,
                 headers=self.credentials.headers(extra_headers),
             )
-        except httpx.TimeoutException:
-            raise PrintfulError(f"Request to {_url(request)} timed out.")
+        except httpx.TimeoutException as exc:
+            raise PrintfulError(f"Request to {_url(request)} timed out.") from exc
         except httpx.RequestError as exc:
-            raise PrintfulError(f"Request error: {exc}")
+            raise PrintfulError(f"Request error: {exc}") from exc
         return _normalize(request, response)
 
     async def close(self) -> None:

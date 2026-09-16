@@ -4,6 +4,7 @@ A Request says what to send without sending it. Building one performs no I/O,
 so endpoint paths and payload shapes can be asserted without a network call —
 and the same description serves a synchronous CLI and an asynchronous server.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace

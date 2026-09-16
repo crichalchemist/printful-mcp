@@ -4,6 +4,7 @@ Printful exposes only "add a file" and "get a file by ID" — there is no list-f
 endpoint in either API version. `list_added` reads the session's local record
 instead, which is the only way to recall IDs added through this CLI.
 """
+
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
@@ -12,8 +13,9 @@ from printful_core.endpoints import files as endpoints
 from printful_core.transport import SyncTransport
 
 
-def add_file(transport: SyncTransport, url: str, filename: Optional[str] = None,
-             visible: bool = True) -> Dict[str, Any]:
+def add_file(
+    transport: SyncTransport, url: str, filename: Optional[str] = None, visible: bool = True
+) -> Dict[str, Any]:
     return transport.send(endpoints.add_file(url, filename, visible))
 
 

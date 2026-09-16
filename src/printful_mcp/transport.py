@@ -4,6 +4,7 @@ This is deliberately not a FastMCP lifespan handler. A lifespan handler was
 tried here and failed, and the commits that reached this lazy-global design
 exist for that reason -- see `CLAUDE.md` in the repository root. Do not reintroduce one.
 """
+
 from __future__ import annotations
 
 import asyncio

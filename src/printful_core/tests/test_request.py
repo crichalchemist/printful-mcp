@@ -1,4 +1,5 @@
 import dataclasses
+
 import pytest
 
 from printful_core.request import Request

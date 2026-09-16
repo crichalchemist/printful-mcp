@@ -4,8 +4,10 @@ X-PF-Store-Id is sent only when a store is configured. Account-level tokens
 require it on every store-scoped endpoint; store-level tokens carry their own
 context and must not send it.
 """
+
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 from dataclasses import dataclass
@@ -35,10 +37,8 @@ def save_config(config: Dict[str, Any]) -> None:
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     with open(CONFIG_FILE, "w") as handle:
         json.dump(config, handle, indent=2)
-    try:
+    with contextlib.suppress(OSError):
         os.chmod(CONFIG_FILE, 0o600)
-    except OSError:
-        pass
 
 
 @dataclass(frozen=True)
@@ -47,8 +47,9 @@ class Credentials:
     store_id: Optional[str] = None
 
     @classmethod
-    def resolve(cls, api_key: Optional[str] = None,
-                store_id: Optional[Any] = None) -> "Credentials":
+    def resolve(
+        cls, api_key: Optional[str] = None, store_id: Optional[Any] = None
+    ) -> "Credentials":
         """Resolve credentials: explicit argument, then environment, then config."""
         config = load_config()
 

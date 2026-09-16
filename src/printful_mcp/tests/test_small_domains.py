@@ -1,4 +1,5 @@
 """files, stores and sync: what each tool sends and what it renders."""
+
 from printful_mcp.models.inputs import (
     AddFileInput,
     GetFileInput,
@@ -17,8 +18,7 @@ async def test_store_templates_send_paging_not_a_product_id(transport):
     positional call here binds that id to `limit` and silently returns the
     wrong collection with no error.
     """
-    await stores.list_store_templates(
-        transport, ListStoreTemplatesInput(limit=5, offset=10))
+    await stores.list_store_templates(transport, ListStoreTemplatesInput(limit=5, offset=10))
     assert transport.last.path == "/product-templates"
     assert transport.last.params == {"limit": 5, "offset": 10}
 
@@ -30,10 +30,12 @@ async def test_product_templates_render_the_v1_items_key(transport):
     answer that looks like a correct one, which is why this asserts on a row
     that must appear rather than on the count line alone.
     """
-    transport._responses.append({
-        "items": [{"id": 77, "title": "Summer Tee", "product_id": 71}],
-        "paging": {"total": 1},
-    })
+    transport._responses.append(
+        {
+            "items": [{"id": 77, "title": "Summer Tee", "product_id": 71}],
+            "paging": {"total": 1},
+        }
+    )
     out = await stores.list_store_templates(transport, ListStoreTemplatesInput())
     assert "Summer Tee" in out
     assert "Showing 1 templates" in out
@@ -71,10 +73,10 @@ async def test_file_visibility_reaches_the_request(transport):
     """
     # markdown.file_added reads id/status/url unguarded, so the empty-queue
     # default {"data": {}} would raise KeyError inside the tool's try block.
-    transport._responses.append({"data": {
-        "id": 9, "status": "waiting", "url": "https://example.com/art.png"}})
-    await files.add_file(transport, AddFileInput(
-        url="https://example.com/art.png", visible=False))
+    transport._responses.append(
+        {"data": {"id": 9, "status": "waiting", "url": "https://example.com/art.png"}}
+    )
+    await files.add_file(transport, AddFileInput(url="https://example.com/art.png", visible=False))
     assert transport.last.json["visible"] is False
 
 
@@ -86,8 +88,9 @@ async def test_a_file_still_processing_says_so(transport):
     through the wrong one. `file_added`'s message is useful because it tells
     the caller what to do next -- assert on that part specifically.
     """
-    transport._responses.append({"data": {
-        "id": 9, "status": "waiting", "url": "https://example.com/art.png"}})
+    transport._responses.append(
+        {"data": {"id": 9, "status": "waiting", "url": "https://example.com/art.png"}}
+    )
     out = await files.add_file(transport, AddFileInput(url="https://example.com/art.png"))
     assert "Check status with printful_get_file" in out
 
@@ -100,8 +103,10 @@ async def test_store_statistics_pass_the_date_window_through(transport):
     nothing verified that wiring reached the rendered text until this assertion.
     """
     transport._responses.append({"data": {"store_id": 12345678, "currency": "USD"}})
-    out = await stores.get_store_statistics(transport, GetStoreStatsInput(
-        store_id=12345678, date_from="2026-01-01", date_to="2026-01-31"))
+    out = await stores.get_store_statistics(
+        transport,
+        GetStoreStatsInput(store_id=12345678, date_from="2026-01-01", date_to="2026-01-31"),
+    )
     assert transport.last.params["date_from"] == "2026-01-01"
     assert transport.last.params["date_to"] == "2026-01-31"
     assert "2026-01-01 to 2026-01-31" in out
@@ -113,8 +118,7 @@ async def test_get_file_looks_up_the_requested_file_id(transport):
     A caller checking whether their upload finished would be told about
     someone else's file instead.
     """
-    transport._responses.append({"data": {
-        "id": 9, "status": "waiting", "created": "2026-01-01"}})
+    transport._responses.append({"data": {"id": 9, "status": "waiting", "created": "2026-01-01"}})
     await files.get_file(transport, GetFileInput(file_id=9))
     assert transport.last.path == "/files/9"
 
@@ -136,10 +140,12 @@ async def test_get_sync_product_looks_up_the_requested_product(transport):
     A caller asking for one product's saved design would silently see
     another product's data instead.
     """
-    transport._responses.append({
-        "sync_product": {"id": 1, "name": "Tee"},
-        "sync_variants": [],
-    })
+    transport._responses.append(
+        {
+            "sync_product": {"id": 1, "name": "Tee"},
+            "sync_variants": [],
+        }
+    )
     await sync.get_sync_product(transport, GetSyncProductInput(sync_product_id=1))
     assert transport.last.path == "/store/products/1"
 
@@ -152,10 +158,12 @@ async def test_sync_products_render_from_the_v1_items_envelope(transport):
     populated store reported as empty, with no error. Its sibling
     `markdown.store_templates` already absorbs both.
     """
-    transport._responses.append({
-        "items": [{"id": 3, "name": "Summer Tee", "external_id": "ext-3"}],
-        "paging": {"total": 1},
-    })
+    transport._responses.append(
+        {
+            "items": [{"id": 3, "name": "Summer Tee", "external_id": "ext-3"}],
+            "paging": {"total": 1},
+        }
+    )
     out = await sync.list_sync_products(transport, ListSyncProductsInput())
     assert "Summer Tee" in out
     assert "(1 shown)" in out

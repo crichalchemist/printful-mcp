@@ -11,8 +11,9 @@ from printful_core.transport import AsyncTransport
 from ..models.inputs import CalculateShippingInput, CalculateTaxInput
 
 
-async def calculate_shipping_rates(transport: AsyncTransport,
-                                   params: CalculateShippingInput) -> str:
+async def calculate_shipping_rates(
+    transport: AsyncTransport, params: CalculateShippingInput
+) -> str:
     """
     Calculate shipping rates for an order.
 
@@ -22,13 +23,17 @@ async def calculate_shipping_rates(transport: AsyncTransport,
     try:
         items = json.loads(params.items_json)
     except json.JSONDecodeError:
-        return ('Error: items_json must be valid JSON array. Example: '
-                '[{"catalog_variant_id": 4011, "quantity": 1, "source": "catalog"}]')
+        return (
+            "Error: items_json must be valid JSON array. Example: "
+            '[{"catalog_variant_id": 4011, "quantity": 1, "source": "catalog"}]'
+        )
     if not isinstance(items, list) or not items:
         return "Error: items_json must be a non-empty JSON array of order items."
     if not all(isinstance(item, dict) for item in items):
-        return ("Error: every entry in items_json must be a JSON object, "
-                'e.g. [{"catalog_variant_id": 4012, "quantity": 1}].')
+        return (
+            "Error: every entry in items_json must be a JSON object, "
+            'e.g. [{"catalog_variant_id": 4012, "quantity": 1}].'
+        )
 
     recipient = {"country_code": params.recipient_country_code}
     if params.recipient_state_code:
@@ -76,8 +81,11 @@ async def calculate_tax(transport: AsyncTransport, params: CalculateTaxInput) ->
     """
     try:
         request = shipping.calculate_tax(
-            params.country_code, state_code=params.state_code,
-            city=params.city, zip_code=params.zip_code)
+            params.country_code,
+            state_code=params.state_code,
+            city=params.city,
+            zip_code=params.zip_code,
+        )
         data = await transport.send(request)
         if params.format == "json":
             return json.dumps(data, indent=2)

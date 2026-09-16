@@ -13,12 +13,14 @@ mocked unit tests in test_core.py instead:
 
 See TEST.md for the full reasoning.
 """
+
 from __future__ import annotations
 
 import json
 import os
 import subprocess
 import sys
+from typing import ClassVar
 
 import pytest
 
@@ -38,21 +40,20 @@ KNOWN_PRODUCT_ID = 71
 
 # Printful rejects a catalog order item with no `placements` — it has nothing
 # to print. Verified live: "Property `placements` is required".
-ARTWORK_URL = (
-    "https://raw.githubusercontent.com/github/explore/main/topics/python/python.png"
-)
+ARTWORK_URL = "https://raw.githubusercontent.com/github/explore/main/topics/python/python.png"
 
 
 def _catalog_item(variant_id, quantity=1, with_design=True):
     """Build an order item in the shape the live v2 API accepts."""
-    item = {"source": "catalog", "catalog_variant_id": variant_id,
-            "quantity": quantity}
+    item = {"source": "catalog", "catalog_variant_id": variant_id, "quantity": quantity}
     if with_design:
-        item["placements"] = [{
-            "placement": "front",
-            "technique": "dtg",
-            "layers": [{"type": "file", "url": ARTWORK_URL}],
-        }]
+        item["placements"] = [
+            {
+                "placement": "front",
+                "technique": "dtg",
+                "layers": [{"type": "file", "url": ARTWORK_URL}],
+            }
+        ]
     return item
 
 
@@ -107,6 +108,7 @@ def known_variant_id(transport):
 # --------------------------------------------------------------------------
 # Read-only live calls — free and idempotent
 # --------------------------------------------------------------------------
+
 
 @pytest.mark.live
 class TestLiveReadOnly:
@@ -199,6 +201,7 @@ class TestLiveReadOnly:
 # Live writes — drafts only, cleaned up afterwards
 # --------------------------------------------------------------------------
 
+
 @pytest.mark.live
 class TestLiveDraftOrder:
     def test_shipping_rates_for_us_destination(self, transport, known_variant_id):
@@ -237,9 +240,7 @@ class TestLiveDraftOrder:
             "country_code": "US",
             "zip": "28273",
         }
-        created = orders_mod.create_order(
-            transport, recipient, [_catalog_item(known_variant_id)]
-        )
+        created = orders_mod.create_order(transport, recipient, [_catalog_item(known_variant_id)])
         body = created.get("data", created)
         order_id = body.get("id")
         assert order_id, f"No order ID in response: {body}"
@@ -260,7 +261,7 @@ class TestLiveDraftOrder:
             orders_mod.cancel_order(transport, str(order_id))
             print(f"  Draft order {order_id} cancelled (cleanup)")
 
-    ESTIMATE_RECIPIENT = {
+    ESTIMATE_RECIPIENT: ClassVar[dict] = {
         "address1": "11025 Westlake Dr",
         "city": "Charlotte",
         "state_code": "NC",
@@ -270,17 +271,18 @@ class TestLiveDraftOrder:
 
     def test_estimate_costs(self, transport, known_variant_id):
         data = orders_mod.estimate_costs(
-            transport, self.ESTIMATE_RECIPIENT,
-            [_catalog_item(known_variant_id)], max_wait=45, interval=3,
+            transport,
+            self.ESTIMATE_RECIPIENT,
+            [_catalog_item(known_variant_id)],
+            max_wait=45,
+            interval=3,
         )
         body = data.get("data", data)
         assert body.get("status") == "completed"
         assert body.get("costs"), "Completed estimate should carry costs"
-        print(f"\n  Estimated total: {body['costs'].get('total')} "
-              f"{body['costs'].get('currency')}")
+        print(f"\n  Estimated total: {body['costs'].get('total')} {body['costs'].get('currency')}")
 
-    def test_estimation_rejects_an_item_with_no_artwork(self, transport,
-                                                        known_variant_id):
+    def test_estimation_rejects_an_item_with_no_artwork(self, transport, known_variant_id):
         """Where the artwork asymmetry ends: estimation sides with ordering.
 
         Shipping rates quote an item with no `placements`; `POST /v2/orders`
@@ -292,9 +294,11 @@ class TestLiveDraftOrder:
         """
         with pytest.raises(PrintfulError) as exc:
             orders_mod.estimate_costs(
-                transport, self.ESTIMATE_RECIPIENT,
+                transport,
+                self.ESTIMATE_RECIPIENT,
                 [_catalog_item(known_variant_id, with_design=False)],
-                max_wait=45, interval=3,
+                max_wait=45,
+                interval=3,
             )
         assert "placements" in exc.value.message, (
             f"Expected the API's own placements message, got {exc.value.message!r}"
@@ -306,11 +310,12 @@ class TestLiveDraftOrder:
 # Opt-in: writes to the file library and burns mockup quota
 # --------------------------------------------------------------------------
 
+
 @pytest.mark.live
 @pytest.mark.skipif(
     not MOCKUPS_ENABLED,
     reason="Mockup/file E2E is opt-in: rate limited (2/60s on new stores) and "
-           "consumes the account's 20k files/24h budget. Set PRINTFUL_E2E_MOCKUPS=1.",
+    "consumes the account's 20k files/24h budget. Set PRINTFUL_E2E_MOCKUPS=1.",
 )
 class TestLiveMockups:
     DESIGN_URL = "https://raw.githubusercontent.com/github/explore/main/topics/python/python.png"
@@ -352,8 +357,7 @@ class TestLiveMockups:
     def test_file_add_list_get_roundtrip(self, transport):
         from printful_cli.core import files as files_mod
 
-        added = files_mod.add_file(transport, self.DESIGN_URL,
-                                   filename="harness-test.png")
+        added = files_mod.add_file(transport, self.DESIGN_URL, filename="harness-test.png")
         body = added.get("data", added)
         file_id = body.get("id")
         assert file_id
@@ -366,6 +370,7 @@ class TestLiveMockups:
 # --------------------------------------------------------------------------
 # CLI subprocess tests — the installed command, as a user or agent runs it
 # --------------------------------------------------------------------------
+
 
 class TestCLISubprocess:
     CLI_BASE = _resolve_cli("printful")
@@ -395,8 +400,7 @@ class TestCLISubprocess:
     def test_confirm_without_yes_refuses(self, tmp_path):
         """The money guard must hold through the real installed binary."""
         result = self._run(
-            ["--json", "--session", str(tmp_path / "s.json"),
-             "orders", "confirm", "1"],
+            ["--json", "--session", str(tmp_path / "s.json"), "orders", "confirm", "1"],
             check=False,
         )
         assert result.returncode != 0
@@ -405,24 +409,62 @@ class TestCLISubprocess:
 
     def test_draft_workflow_persists_across_processes(self, tmp_path):
         session = str(tmp_path / "workflow.json")
-        r1 = self._run(["--json", "--session", session, "draft", "recipient",
-                        "--name", "Jane Doe", "--address1", "1 Main St",
-                        "--city", "Berlin", "--country-code", "DE",
-                        "--zip", "10115"])
+        r1 = self._run(
+            [
+                "--json",
+                "--session",
+                session,
+                "draft",
+                "recipient",
+                "--name",
+                "Jane Doe",
+                "--address1",
+                "1 Main St",
+                "--city",
+                "Berlin",
+                "--country-code",
+                "DE",
+                "--zip",
+                "10115",
+            ]
+        )
         assert json.loads(r1.stdout)["recipient_set"] is True
 
         # A catalog item needs artwork before the order can be created, though
         # not before it can be rate-quoted.
-        r2 = self._run(["--json", "--session", session, "draft", "add-item",
-                        "--variant-id", "4012", "--quantity", "2"])
+        r2 = self._run(
+            [
+                "--json",
+                "--session",
+                session,
+                "draft",
+                "add-item",
+                "--variant-id",
+                "4012",
+                "--quantity",
+                "2",
+            ]
+        )
         summary = json.loads(r2.stdout)["summary"]
         assert summary["priceable"] is True
         assert summary["complete"] is False
         assert summary["items_without_design"] == 1
 
-        r2b = self._run(["--json", "--session", session, "draft", "add-item",
-                         "--variant-id", "4013", "--quantity", "1",
-                         "--image-url", ARTWORK_URL])
+        r2b = self._run(
+            [
+                "--json",
+                "--session",
+                session,
+                "draft",
+                "add-item",
+                "--variant-id",
+                "4013",
+                "--quantity",
+                "1",
+                "--image-url",
+                ARTWORK_URL,
+            ]
+        )
         assert json.loads(r2b.stdout)["summary"]["items_without_design"] == 1
 
         r3 = self._run(["--json", "--session", session, "draft", "show"])

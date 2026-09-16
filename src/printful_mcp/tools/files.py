@@ -18,8 +18,7 @@ async def add_file(transport: AsyncTransport, params: AddFileInput) -> str:
     Status will be 'waiting' initially, then 'ok' or 'failed' after processing.
     """
     try:
-        request = files.add_file(
-            params.url, filename=params.filename, visible=params.visible)
+        request = files.add_file(params.url, filename=params.filename, visible=params.visible)
         data = await transport.send(request)
         if params.format == "json":
             return json.dumps(data, indent=2)

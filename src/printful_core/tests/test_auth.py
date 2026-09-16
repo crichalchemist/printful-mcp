@@ -29,7 +29,7 @@ def test_config_used_when_nothing_else_set():
 
 
 def test_missing_key_raises_with_instructions():
-    with pytest.raises(PrintfulAuthError, match="printful.com/dashboard/api"):
+    with pytest.raises(PrintfulAuthError, match=r"printful\.com/dashboard/api"):
         auth.Credentials.resolve()
 
 

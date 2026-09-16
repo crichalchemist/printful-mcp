@@ -29,7 +29,7 @@ Or use the provided script:
 ### What You'll See
 
 - Opens browser at `http://localhost:5173`
-- Lists all 17 tools with descriptions
+- Lists all 32 tools with descriptions
 - Click any tool to see input parameters
 - Fill in parameters and click "Run"
 - See real-time responses
@@ -103,27 +103,27 @@ Try these prompts in Cursor:
 # test_manual.py
 import asyncio
 import os
-from printful_mcp.client import PrintfulClient
-from printful_mcp.models.inputs import ListCatalogProductsInput
-from printful_mcp.tools.catalog import list_catalog_products
+from printful_core.auth import Credentials
+from printful_core.transport import AsyncTransport
+from printful_core.endpoints import catalog
+from printful_core.errors import PrintfulError
 
 async def test_catalog():
     # Set your API key
     os.environ['PRINTFUL_API_KEY'] = 'your-api-key-here'
-    
-    # Create client
-    client = PrintfulClient()
-    
+
+    # Create transport
+    transport = AsyncTransport(Credentials.resolve())
+
     try:
         # Test listing products
-        params = ListCatalogProductsInput(
-            limit=5,
-            format="markdown"
-        )
-        result = await list_catalog_products(client, params)
+        request = catalog.list_products(limit=5)
+        result = await transport.send(request)
         print(result)
+    except PrintfulError as e:
+        print(f"Error: {e.message}")
     finally:
-        await client.close()
+        await transport.close()
 
 if __name__ == "__main__":
     asyncio.run(test_catalog())
@@ -139,23 +139,35 @@ python test_manual.py
 ### Create Test Suite
 
 ```python
-# tests/test_client.py
+# tests/test_transport_contract.py
 import pytest
-from printful_mcp.client import PrintfulClient, PrintfulAPIError
+from printful_core.auth import Credentials
+from printful_core.errors import PrintfulAuthError
 
-def test_client_requires_api_key(monkeypatch):
-    """Test that client fails without API key."""
+def test_resolve_requires_api_key(monkeypatch):
+    """Test that credential resolution fails without an API key."""
     monkeypatch.delenv("PRINTFUL_API_KEY", raising=False)
-    with pytest.raises(ValueError, match="PRINTFUL_API_KEY"):
-        PrintfulClient()
+    with pytest.raises(PrintfulAuthError, match="No Printful API token"):
+        Credentials.resolve()
 
 @pytest.mark.asyncio
-async def test_client_makes_request(monkeypatch):
-    """Test that client can make requests."""
-    monkeypatch.setenv("PRINTFUL_API_KEY", "test-key")
-    client = PrintfulClient()
-    # Add mock tests here
-    await client.close()
+async def test_transport_sends_the_built_request():
+    """Test that a request built by an endpoint reaches the transport unchanged."""
+    from printful_core.endpoints import catalog
+
+    class RecordingTransport:
+        def __init__(self):
+            self.sent = []
+
+        async def send(self, request, extra_headers=None):
+            self.sent.append(request)
+            return {"data": []}
+
+    transport = RecordingTransport()
+    request = catalog.list_products(limit=5)
+    await transport.send(request)
+    assert transport.sent[0].path == "/catalog-products"
+    assert transport.sent[0].params["limit"] == 5
 ```
 
 Run tests:
@@ -179,13 +191,16 @@ export PRINTFUL_API_KEY=your-api-key
 # Test 1: List products (safe)
 python -c "
 import asyncio
-from printful_mcp.client import PrintfulClient
+from printful_core.auth import Credentials
+from printful_core.transport import AsyncTransport
+from printful_core.endpoints import catalog
 
 async def test():
-    client = PrintfulClient()
-    result = await client.get('/catalog-products', params={'limit': 3})
+    transport = AsyncTransport(Credentials.resolve())
+    request = catalog.list_products(limit=3)
+    result = await transport.send(request)
     print(result)
-    await client.close()
+    await transport.close()
 
 asyncio.run(test())
 "
@@ -196,26 +211,37 @@ asyncio.run(test())
 ```python
 # This creates a DRAFT order (not charged)
 import asyncio
-from printful_mcp.client import PrintfulClient
+from printful_core.auth import Credentials
+from printful_core.transport import AsyncTransport
+from printful_core.endpoints import orders
+from printful_core.errors import PrintfulError
 
 async def test_order():
-    client = PrintfulClient()
+    transport = AsyncTransport(Credentials.resolve())
     try:
-        order_data = {
-            "recipient": {
+        item = orders.build_catalog_item(
+            catalog_variant_id=48504, quantity=1,
+            image_url="https://via.placeholder.com/500x500.png",
+            placement="default", technique="digital",
+        )
+        request = orders.create_order(
+            recipient={
                 "name": "Test User",
                 "address1": "123 Test St",
                 "city": "Los Angeles",
                 "state_code": "CA",
                 "country_code": "US",
-                "zip": "90001"
+                "zip": "90001",
             },
-            "external_id": "test-order-123"
-        }
-        result = await client.post('/orders', json_data=order_data)
+            items=[item],
+            external_id="test-order-123",
+        )
+        result = await transport.send(request)
         print(f"Created draft order: {result['data']['id']}")
+    except PrintfulError as e:
+        print(f"Error: {e.message}")
     finally:
-        await client.close()
+        await transport.close()
 
 asyncio.run(test_order())
 ```
@@ -299,7 +325,7 @@ npx @modelcontextprotocol/inspector python -m printful_mcp
 Your MCP server is working correctly if:
 
 - ✅ Server starts without errors (with API key set)
-- ✅ MCP Inspector shows all 17 tools
+- ✅ MCP Inspector shows all 32 tools
 - ✅ Read-only tools return data from Printful
 - ✅ Invalid inputs show clear error messages
 - ✅ Rate limiting is detected and handled

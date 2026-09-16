@@ -17,6 +17,18 @@ class TestExtractMessage:
     def test_rfc9457_detail(self):
         assert extract_message({"detail": "Bad variant"}) == "Bad variant"
 
+    def test_detail_beats_title_when_both_are_present(self):
+        """RFC 9457 sends both, and they are not interchangeable.
+
+        `title` is the generic class of error ("Invalid request"); `detail` is
+        the specific one ("Bad variant id 999"). A caller who gets the title
+        learns nothing actionable. The real API sends both on every validation
+        failure, so the ordering -- not either key alone -- is what matters.
+        """
+        assert extract_message(
+            {"detail": "Bad variant id 999", "title": "Invalid request"}
+        ) == "Bad variant id 999"
+
     def test_rfc9457_title_fallback(self):
         assert extract_message({"title": "Invalid"}) == "Invalid"
 

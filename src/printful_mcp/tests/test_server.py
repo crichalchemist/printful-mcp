@@ -1,9 +1,10 @@
 """The server's registration surface.
 
-These are the tests that make the parity claim checkable. The spec's prose said
-"fourteen operations" and its table said twelve; the code says thirteen. Rather
-than pick a number, this asserts the property the number was trying to express:
-every endpoint the core can build, the server can reach.
+These are the tests that make the parity claim checkable. The spec's prose and
+table disagreed with each other and with the code about how many operations
+this plan added. Rather than pick a number, this asserts the property the
+number was trying to express: every endpoint the core can build, the server
+can reach, through exactly one registered tool.
 
 `tool.annotations` is a `ToolAnnotations` object with attribute access, and
 `mcp.list_tools()` is a coroutine returning `list[Tool]`. Both were confirmed
@@ -24,6 +25,10 @@ _SRC = pathlib.Path(__file__).resolve().parents[2]
 UNBOUND_ON_PURPOSE: dict[str, str] = {}
 
 ENDPOINT_MODULES = {"catalog", "files", "mockups", "orders", "shipping", "stores", "sync"}
+# printful_mcp.tools mirrors printful_core.endpoints module-for-module by
+# convention, so the same set names both; kept as a separate name because
+# _delegate_targets and _builders_bound_by_tools read different trees.
+TOOL_MODULES = ENDPOINT_MODULES
 
 
 def _core_request_builders() -> set:
@@ -57,6 +62,40 @@ def _builders_bound_by_tools() -> set:
                     and fn.value.id in ENDPOINT_MODULES):
                 bound.add(f"{fn.value.id}.{fn.attr}")
     return bound
+
+
+def _tool_functions() -> set:
+    """Every public async function in printful_mcp.tools -- the implementations."""
+    root = _SRC / "printful_mcp" / "tools"
+    found = set()
+    for path in sorted(root.glob("*.py")):
+        if path.stem == "__init__":
+            continue
+        for node in ast.parse(path.read_text()).body:
+            if isinstance(node, ast.AsyncFunctionDef) and not node.name.startswith("_"):
+                found.add(f"{path.stem}.{node.name}")
+    return found
+
+
+def _delegate_targets() -> set:
+    """Every `<tools module>.<function>(` call made from a server.py delegate.
+
+    server.py is the only place a registered tool NAME is tied to an
+    implementation, and `list_tools()` cannot see a function body. Read the
+    source for the same reason the endpoint tests do: importing to inspect
+    would resolve credentials.
+    """
+    src = (_SRC / "printful_mcp" / "server.py").read_text()
+    found = set()
+    for node in ast.walk(ast.parse(src)):
+        if not isinstance(node, ast.Call):
+            continue
+        fn = node.func
+        if (isinstance(fn, ast.Attribute)
+                and isinstance(fn.value, ast.Name)
+                and fn.value.id in TOOL_MODULES):
+            found.add(f"{fn.value.id}.{fn.attr}")
+    return found
 
 
 async def _tools():
@@ -105,14 +144,58 @@ async def test_one_registered_tool_per_bound_endpoint():
     )
 
 
-async def test_no_tool_name_is_registered_twice():
-    """FastMCP silently keeps the last registration under a duplicate name.
+def test_every_tool_function_is_reachable_through_exactly_one_delegate():
+    """A delegate pointing at the wrong function orphans the right one.
 
-    Eight tasks appended registrations to one file; a copy-paste that reuses a
-    name loses a tool with no error anywhere.
+    The two set tests above read `tools/` and cannot see `server.py`; the
+    count test reads `list_tools()` and cannot see a function body. Between
+    them a delegate can call the wrong implementation, leaving one tool
+    function unreachable and the count unchanged, which is a wrong answer
+    with no failing test. Comparing the two sets names the orphan.
     """
-    names = [tool.name for tool in await _tools()]
-    assert len(names) == len(set(names))
+    implemented = _tool_functions()
+    delegated = _delegate_targets()
+    assert implemented - delegated == set(), (
+        f"no delegate calls these tool functions: {sorted(implemented - delegated)}")
+    assert delegated - implemented == set(), (
+        f"server.py delegates to functions that do not exist: "
+        f"{sorted(delegated - implemented)}")
+
+
+def _registered_tool_names() -> list:
+    """Every name passed to an @mcp.tool decorator, in source order.
+
+    Duplicates are invisible at runtime: FastMCP keeps the first registration
+    under a repeated name and rejects the second with a printed warning, not
+    an exception, so `list_tools()` silently returns one tool where two were
+    written. Only the source shows both.
+    """
+    src = (_SRC / "printful_mcp" / "server.py").read_text()
+    names = []
+    for node in ast.walk(ast.parse(src)):
+        if not isinstance(node, ast.AsyncFunctionDef):
+            continue
+        for dec in node.decorator_list:
+            if not isinstance(dec, ast.Call):
+                continue
+            for kw in dec.keywords:
+                if kw.arg == "name" and isinstance(kw.value, ast.Constant):
+                    names.append(kw.value.value)
+    return names
+
+
+def test_no_tool_name_is_registered_twice():
+    """A repeated name loses a tool with no error anywhere.
+
+    Nine tasks appended registrations to one file. FastMCP keeps the first
+    registration under a duplicate name and prints a warning for the second
+    rather than raising, so the *later* tool simply stops existing -- and a
+    runtime check cannot see it, because the rejected registration never
+    reaches `list_tools()`.
+    """
+    names = _registered_tool_names()
+    duplicated = sorted({n for n in names if names.count(n) > 1})
+    assert not duplicated, f"registered more than once in server.py: {duplicated}"
 
 
 async def test_every_tool_is_namespaced():

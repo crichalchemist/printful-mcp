@@ -40,7 +40,7 @@ dependencies = [
     "httpx>=0.27.0",
     "pydantic>=2.0.0",
     "python-dotenv>=1.0.0",
-    # cli-anything-printful (src/cli_anything/printful)
+    # printful_cli (src/printful_cli)
     "click>=8.0.0",
     "prompt_toolkit>=3.0.0",
 ]
@@ -62,7 +62,7 @@ Issues = "https://github.com/Purple-Horizons/printful-mcp/issues"
 # `python test_server.py`), not pytest modules: they define module-level
 # `async def test_*` with no asyncio mode, so pytest collects them and then
 # fails all 14. Scoping collection to the real suite keeps `pytest` meaningful.
-testpaths = ["src/printful_core/tests", "src/cli_anything/printful/tests", "tests"]
+testpaths = ["src/printful_core/tests", "src/printful_cli/tests", "tests"]
 # Live tests call the real Printful API and need PRINTFUL_API_KEY, so they are
 # not in the default selection — a fresh clone runs the offline suite and gets
 # a clean result. They are NOT softened: when selected without credentials they
@@ -78,14 +78,10 @@ asyncio_mode = "auto"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-# cli_anything/ is a PEP 420 namespace package shared across cli-anything
-# harnesses and deliberately has no __init__.py, so namespace discovery must
-# stay enabled.
-namespaces = true
 
 [tool.setuptools.package-data]
-"cli_anything.printful" = ["skills/*.md"]
+"printful_cli" = ["skills/*.md"]
 
 [project.scripts]
 printful-mcp = "printful_mcp.server:main"
-cli-anything-printful = "cli_anything.printful.printful_cli:main"
+printful = "printful_cli.printful_cli:main"

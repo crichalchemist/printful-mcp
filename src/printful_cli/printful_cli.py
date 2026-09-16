@@ -1,4 +1,4 @@
-"""cli-anything-printful — command-line harness for the Printful API.
+"""printful — command-line harness for the Printful API.
 
 Safety: `orders confirm` submits an order for fulfillment and charges the account.
 `orders cancel` is destructive. Both refuse to run without an explicit --yes.
@@ -31,23 +31,23 @@ from .utils.printful_backend import (
     save_config,
     CONFIG_FILE,
 )
-from .utils.repl_skin import ReplSkin
+from .ui import UI
 
 _repl_mode = False
 _session: Optional[session_mod.PrintfulSession] = None
 _backend: Optional[PrintfulBackend] = None
-_skin: Optional[ReplSkin] = None
+_ui: Optional[UI] = None
 
 
 # --------------------------------------------------------------------------
 # Shared helpers
 # --------------------------------------------------------------------------
 
-def get_skin() -> ReplSkin:
-    global _skin
-    if _skin is None:
-        _skin = ReplSkin("printful", version=__version__)
-    return _skin
+def get_ui() -> UI:
+    global _ui
+    if _ui is None:
+        _ui = UI()
+    return _ui
 
 
 def get_session(session_file: Optional[str] = None) -> session_mod.PrintfulSession:
@@ -74,9 +74,9 @@ def output(ctx, data: Any, message: str = "", table: Optional[Dict[str, Any]] = 
         click.echo(json_mod.dumps(data, indent=2, default=str))
         return
 
-    skin = get_skin()
+    ui = get_ui()
     if table and table.get("rows"):
-        skin.table(table["headers"], table["rows"])
+        ui.table(table["headers"], table["rows"])
     elif isinstance(data, dict):
         _print_dict(data)
     elif isinstance(data, list):
@@ -85,7 +85,7 @@ def output(ctx, data: Any, message: str = "", table: Optional[Dict[str, Any]] = 
     else:
         click.echo(str(data))
     if message:
-        skin.success(message)
+        ui.success(message)
 
 
 def _print_dict(d: Dict[str, Any], indent: int = 0) -> None:
@@ -133,8 +133,8 @@ def handle_error(func):
             if "store_id" in message.lower():
                 hint = (
                     "This token is account-level, so a store must be selected "
-                    "first:\n  cli-anything-printful store use          "
-                    "# pick from a list\n  cli-anything-printful store use <ID> "
+                    "first:\n  printful store use          "
+                    "# pick from a list\n  printful store use <ID> "
                     "--save   # set the default"
                 )
                 message = f"{message}\n{hint}"
@@ -152,7 +152,7 @@ def _fail(message: str, payload: Dict[str, Any]) -> None:
     if use_json:
         click.echo(json_mod.dumps(payload, indent=2, default=str), err=True)
     else:
-        get_skin().error(message)
+        get_ui().error(message)
     if _repl_mode:
         return
     sys.exit(1)
@@ -217,7 +217,7 @@ def _require_yes(yes: bool, action: str, detail: str) -> None:
               help="Store ID for account-level tokens (sets X-PF-Store-Id)")
 @click.option("--session", "session_file", default=None,
               help="Path to the session file")
-@click.version_option(version=__version__, prog_name="cli-anything-printful")
+@click.version_option(version=__version__, prog_name="printful")
 @click.pass_context
 def cli(ctx, use_json, dry_run, api_key, store_id, session_file):
     """Command-line harness for the Printful print-on-demand API.
@@ -886,9 +886,9 @@ def store_use(ctx, store_id, save):
                 + "\nRe-run as: store use <STORE_ID>"
             )
 
-        skin = get_skin()
-        skin.section("Available stores")
-        skin.table(
+        ui = get_ui()
+        ui.section("Available stores")
+        ui.table(
             ["#", "ID", "Name", "Type"],
             [[str(i + 1), str(s["id"]), str(s["name"]), str(s["type"])]
              for i, s in enumerate(rows)],
@@ -898,7 +898,7 @@ def store_use(ctx, store_id, save):
         )
         selected = rows[choice - 1]
         store_id = str(selected["id"])
-        skin.info(f"Selected {selected['name']} ({store_id})")
+        ui.info(f"Selected {selected['name']} ({store_id})")
 
     sess.set_store(store_id)
     if save:
@@ -1202,22 +1202,14 @@ def repl(ctx):
     """Interactive mode."""
     global _repl_mode
     _repl_mode = True
-    skin = get_skin()
-    skin.print_banner()
-    skin.info("Billable commands (orders confirm/cancel) still require --yes here.")
-    try:
-        pt_session = skin.create_prompt_session()
-    except Exception:
-        pt_session = None
+    ui = get_ui()
+    ui.section("printful")
+    ui.info("Billable commands (orders confirm/cancel) still require --yes here.")
 
     sess = get_session()
     while True:
         try:
-            summary = sess.draft.summary()
-            context = (f"draft:{summary['item_count']} item(s)"
-                       if summary["item_count"] else "")
-            line = skin.get_input(pt_session, project_name="printful",
-                                  modified=sess._modified, context=context)
+            line = input("printful> ").strip()
         except (EOFError, KeyboardInterrupt):
             break
         if not line:
@@ -1225,7 +1217,9 @@ def repl(ctx):
         if line in ("exit", "quit", ":q"):
             break
         if line in ("help", "?"):
-            skin.help(REPL_COMMANDS)
+            ui.section("Commands")
+            for name, description in REPL_COMMANDS.items():
+                ui.status(name, description)
             continue
         try:
             args = line.split()
@@ -1233,17 +1227,16 @@ def repl(ctx):
         except SystemExit:
             pass
         except click.ClickException as e:
-            skin.error(e.format_message())
+            ui.error(e.format_message())
         except Exception as e:  # pragma: no cover - interactive safety net
-            skin.error(str(e))
+            ui.error(str(e))
 
     if sess._modified:
         try:
             sess.save_session()
-            skin.success("Session saved.")
+            ui.success("Session saved.")
         except Exception as e:
-            skin.error(f"Could not save session: {e}")
-    skin.print_goodbye()
+            ui.error(f"Could not save session: {e}")
     _repl_mode = False
 
 

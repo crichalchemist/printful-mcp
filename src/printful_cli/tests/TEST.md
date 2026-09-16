@@ -1,4 +1,4 @@
-# TEST.md — cli-anything-printful
+# TEST.md — printful_cli
 
 Part 1 (plan) was written before any test code, per `HARNESS.md` Phase 4.
 Part 2 (results) is appended after execution, per Phase 6.
@@ -139,7 +139,7 @@ Requires a real `PRINTFUL_API_KEY`. These call the live API.
   Gated behind `PRINTFUL_E2E_MOCKUPS=1`; off by default.
 
 **CLI subprocess tests (`TestCLISubprocess`):**
-Resolved with `_resolve_cli("cli-anything-printful")`, no `cwd` set, so the
+Resolved with `_resolve_cli("printful")`, no `cwd` set, so the
 installed console script is exercised as a user or agent would invoke it.
 - `--help` and `--version` exit 0.
 - `--json ship countries` emits parseable JSON.

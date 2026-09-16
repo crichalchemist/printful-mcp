@@ -1,4 +1,4 @@
-"""End-to-end tests for cli-anything-printful against the LIVE Printful API.
+"""End-to-end tests for printful_cli against the LIVE Printful API.
 
 These require a real PRINTFUL_API_KEY. Per HARNESS.md there is no graceful
 degradation: without credentials these tests FAIL rather than skip, because a
@@ -22,11 +22,11 @@ import sys
 
 import pytest
 
-from cli_anything.printful.core import catalog as catalog_mod
-from cli_anything.printful.core import orders as orders_mod
-from cli_anything.printful.core import shipping as shipping_mod
-from cli_anything.printful.core import stores as stores_mod
-from cli_anything.printful.utils.printful_backend import (
+from printful_cli.core import catalog as catalog_mod
+from printful_cli.core import orders as orders_mod
+from printful_cli.core import shipping as shipping_mod
+from printful_cli.core import stores as stores_mod
+from printful_cli.utils.printful_backend import (
     PrintfulBackend,
     PrintfulError,
 )
@@ -60,18 +60,18 @@ def _catalog_item(variant_id, quantity=1, with_design=True):
 def _resolve_cli(name):
     """Resolve installed CLI command; falls back to python -m for dev.
 
-    Set env CLI_ANYTHING_FORCE_INSTALLED=1 to require the installed command.
+    Set env PRINTFUL_FORCE_INSTALLED=1 to require the installed command.
     """
     import shutil
 
-    force = os.environ.get("CLI_ANYTHING_FORCE_INSTALLED", "").strip() == "1"
+    force = os.environ.get("PRINTFUL_FORCE_INSTALLED", "").strip() == "1"
     path = shutil.which(name)
     if path:
         print(f"[_resolve_cli] Using installed command: {path}")
         return [path]
     if force:
         raise RuntimeError(f"{name} not found in PATH. Install with: pip install -e .")
-    module = name.replace("cli-anything-", "cli_anything.") + "." + name.split("-")[-1] + "_cli"
+    module = "printful_cli.printful_cli"
     print(f"[_resolve_cli] Falling back to: {sys.executable} -m {module}")
     return [sys.executable, "-m", module]
 
@@ -306,7 +306,7 @@ class TestLiveMockups:
     DESIGN_URL = "https://raw.githubusercontent.com/github/explore/main/topics/python/python.png"
 
     def test_mockup_styles(self, backend):
-        from cli_anything.printful.core import mockups as mockups_mod
+        from printful_cli.core import mockups as mockups_mod
 
         data = mockups_mod.list_styles(backend, KNOWN_PRODUCT_ID)
         assert data.get("data") is not None
@@ -315,7 +315,7 @@ class TestLiveMockups:
         """Create a real mockup and verify the returned URL serves image bytes."""
         import requests
 
-        from cli_anything.printful.core import mockups as mockups_mod
+        from printful_cli.core import mockups as mockups_mod
 
         created = mockups_mod.create_task(
             backend, KNOWN_PRODUCT_ID, [known_variant_id], self.DESIGN_URL
@@ -338,7 +338,7 @@ class TestLiveMockups:
         print(f"\n  Mockup: {urls[0]} ({len(resp.content):,} bytes)")
 
     def test_file_add_list_get_roundtrip(self, backend):
-        from cli_anything.printful.core import files as files_mod
+        from printful_cli.core import files as files_mod
 
         added = files_mod.add_file(backend, self.DESIGN_URL, filename="harness-test.png")
         body = added.get("data", added)
@@ -355,7 +355,7 @@ class TestLiveMockups:
 # --------------------------------------------------------------------------
 
 class TestCLISubprocess:
-    CLI_BASE = _resolve_cli("cli-anything-printful")
+    CLI_BASE = _resolve_cli("printful")
 
     def _run(self, args, check=True, env=None):
         run_env = dict(os.environ)

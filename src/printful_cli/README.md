@@ -1,4 +1,4 @@
-# cli-anything-printful
+# printful
 
 A command-line harness for the [Printful](https://www.printful.com) print-on-demand
 API. Browse the catalog, build and place orders, calculate shipping, and generate
@@ -36,8 +36,8 @@ pip install -e .
 Verify it landed on PATH:
 
 ```bash
-which cli-anything-printful
-cli-anything-printful --version
+which printful
+printful --version
 ```
 
 ## Configuration
@@ -50,10 +50,10 @@ config file.
 export PRINTFUL_API_KEY=your-token
 
 # Option 2: stored config (written 0600 to ~/.config/cli-anything-printful/config.json)
-cli-anything-printful config set api_key your-token
+printful config set api_key your-token
 
 # Account-level tokens only: set the store context (sends X-PF-Store-Id)
-cli-anything-printful config set store_id 12345
+printful config set store_id 12345
 ```
 
 Store-level tokens already carry their store context and need no store ID.
@@ -63,7 +63,7 @@ estimates will work — otherwise every one returns `This endpoint requires stor
 Pick one interactively:
 
 ```bash
-cli-anything-printful store use
+printful store use
 #   #  ID        Name                    Type
 #   1  905397    Personal orders         native
 #   2  1135966   Fatherhood University   storenvy
@@ -71,7 +71,7 @@ cli-anything-printful store use
 # Select a store [1-3]:
 
 # Or set it directly and make it the default
-cli-anything-printful store use 1135966 --save
+printful store use 1135966 --save
 ```
 
 With `--json`, or when stdin is not a terminal, the picker does not prompt — it
@@ -80,7 +80,7 @@ returns the store list and an instruction, so scripts and agents never hang.
 Check it works:
 
 ```bash
-cli-anything-printful test
+printful test
 ```
 
 ## Usage
@@ -88,48 +88,48 @@ cli-anything-printful test
 Running with no subcommand opens the REPL:
 
 ```bash
-cli-anything-printful
+printful
 ```
 
 One-shot commands:
 
 ```bash
 # Browse
-cli-anything-printful catalog products --limit 5
-cli-anything-printful catalog product 71
-cli-anything-printful catalog variants 71 --limit 5
-cli-anything-printful catalog variant-price 4012
-cli-anything-printful catalog size-guide 71 --unit inches
+printful catalog products --limit 5
+printful catalog product 71
+printful catalog variants 71 --limit 5
+printful catalog variant-price 4012
+printful catalog size-guide 71 --unit inches
 
 # Build an order step by step (artwork is required to place the order)
-cli-anything-printful draft recipient --name "Jane Doe" --address1 "1 Main St" \
+printful draft recipient --name "Jane Doe" --address1 "1 Main St" \
     --city Austin --state-code TX --country-code US --zip 78701
-cli-anything-printful draft add-item --variant-id 4012 --quantity 2 \
+printful draft add-item --variant-id 4012 --quantity 2 \
     --image-url https://example.com/art.png
-cli-anything-printful draft show
+printful draft show
 
 # Price it before committing to anything
-cli-anything-printful ship rates
-cli-anything-printful orders estimate
+printful ship rates
+printful orders estimate
 
 # Create a DRAFT order (not charged)
-cli-anything-printful draft submit
+printful draft submit
 
 # Confirm it — THIS CHARGES YOUR ACCOUNT
-cli-anything-printful orders confirm 12345678 --yes
+printful orders confirm 12345678 --yes
 ```
 
 Every command supports `--json`:
 
 ```bash
-cli-anything-printful --json catalog products --limit 3 | jq '.products[].id'
+printful --json catalog products --limit 3 | jq '.products[].id'
 ```
 
 `--dry-run` suppresses session writes and, for mutating commands, prints the request
 that would have been sent instead of sending it:
 
 ```bash
-cli-anything-printful --dry-run orders confirm 12345678 --yes
+printful --dry-run orders confirm 12345678 --yes
 ```
 
 ## Command groups
@@ -168,10 +168,10 @@ cli-anything-printful --dry-run orders confirm 12345678 --yes
   `complete` separately:
 
   ```bash
-  cli-anything-printful draft add-item --variant-id 4012 --quantity 2
+  printful draft add-item --variant-id 4012 --quantity 2
   # priceable: true, complete: false, items_without_design: 1
 
-  cli-anything-printful draft add-item --variant-id 4012 --quantity 2 \
+  printful draft add-item --variant-id 4012 --quantity 2 \
       --image-url https://example.com/art.png
   # priceable: true, complete: true
   ```
@@ -196,9 +196,9 @@ One-shot mutations auto-save; `--dry-run` suppresses that. Writes use an exclusi
 file lock.
 
 ```bash
-cli-anything-printful session status
-cli-anything-printful session history --limit 5
-cli-anything-printful session clear
+printful session status
+printful session history --limit 5
+printful session clear
 ```
 
 ## Running the tests
@@ -208,11 +208,11 @@ cd agent-harness
 pip install -e ".[dev]"
 
 # Unit tests — no API key, no network
-python -m pytest cli_anything/printful/tests/test_core.py -v
+python -m pytest src/printful_cli/tests/test_core.py -v
 
 # Full suite including live API calls (needs PRINTFUL_API_KEY)
 export PRINTFUL_API_KEY=your-token
-CLI_ANYTHING_FORCE_INSTALLED=1 python -m pytest cli_anything/printful/tests/ -v -s
+PRINTFUL_FORCE_INSTALLED=1 python -m pytest src/printful_cli/tests/ -v -s
 ```
 
 The live E2E tests deliberately never confirm or cancel a real order. See

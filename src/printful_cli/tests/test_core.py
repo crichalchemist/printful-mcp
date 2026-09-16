@@ -1,4 +1,4 @@
-"""Unit tests for cli-anything-printful.
+"""Unit tests for printful_cli.
 
 Synthetic data and a mocked transport only — no network, no API key. The billable
 endpoints (orders confirm) are asserted here against the fake transport precisely
@@ -13,18 +13,18 @@ import tempfile
 import pytest
 from click.testing import CliRunner
 
-from cli_anything.printful.core import catalog as catalog_mod
-from cli_anything.printful.core import files as files_mod
-from cli_anything.printful.core import mockups as mockups_mod
-from cli_anything.printful.core import orders as orders_mod
-from cli_anything.printful.core import shipping as shipping_mod
-from cli_anything.printful.core.session import (
+from printful_cli.core import catalog as catalog_mod
+from printful_cli.core import files as files_mod
+from printful_cli.core import mockups as mockups_mod
+from printful_cli.core import orders as orders_mod
+from printful_cli.core import shipping as shipping_mod
+from printful_cli.core.session import (
     DraftOrder,
     PrintfulSession,
     _locked_save_json,
 )
-from cli_anything.printful.utils import printful_backend as backend_mod
-from cli_anything.printful.utils.printful_backend import (
+from printful_cli.utils import printful_backend as backend_mod
+from printful_cli.utils.printful_backend import (
     PrintfulAuthError,
     PrintfulBackend,
     PrintfulError,
@@ -798,7 +798,7 @@ def _session_path(tmp_path, name="s.json"):
 
 def _fresh_cli():
     """Import the CLI module with its globals reset between tests."""
-    from cli_anything.printful import printful_cli
+    from printful_cli import printful_cli
 
     printful_cli._session = None
     printful_cli._backend = None

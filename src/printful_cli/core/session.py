@@ -1,4 +1,4 @@
-"""Session state for cli-anything-printful.
+"""Session state for printful_cli.
 
 There is no Printful project file, so the persistent state this harness carries is
 the draft order under construction, the selected store, the file IDs added during

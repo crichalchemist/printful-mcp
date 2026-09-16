@@ -1,6 +1,6 @@
 # PRINTFUL.md — Agent Harness SOP for the Printful API
 
-Software-specific standard operating procedure for `cli-anything-printful`, built per
+Software-specific standard operating procedure for `printful` (package `printful_cli`), built per
 `HARNESS.md`. This document records the Phase 1 analysis and the Phase 2 architecture
 decisions, including the two places this harness deliberately deviates from the
 GUI-oriented parts of the harness spec.
@@ -140,7 +140,7 @@ Same for store ID (`--store-id` → `PRINTFUL_STORE_ID` → config).
 
 ### Output
 
-Every command supports `--json`. Human mode uses `ReplSkin` tables and status blocks;
+Every command supports `--json`. Human mode uses `UI` tables and status blocks;
 `--json` emits a single parseable object on stdout with no decoration.
 
 ### Known API limitations, surfaced rather than hidden

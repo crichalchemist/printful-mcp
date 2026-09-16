@@ -36,7 +36,7 @@ TOKEN_HELP = (
     "Get a token at https://www.printful.com/dashboard/api\n"
     "Then either:\n"
     "  export PRINTFUL_API_KEY=your-token\n"
-    "  cli-anything-printful config set api_key your-token"
+    "  printful config set api_key your-token"
 )
 
 

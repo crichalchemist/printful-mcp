@@ -1,9 +1,9 @@
 ---
-name: "cli-anything-printful"
+name: "printful"
 description: "Command-line interface for the Printful print-on-demand API — browse the catalog, build and place orders, calculate shipping and tax, and generate mockups. Includes guards on billable operations."
 ---
 
-# cli-anything-printful
+# printful
 
 A command-line harness for the [Printful](https://www.printful.com) print-on-demand
 API. Browse the catalog, build and place orders, calculate shipping, and generate
@@ -28,7 +28,7 @@ are safe to run.
 ## Installation
 
 ```bash
-pip install cli-anything-printful
+pip install printful-mcp
 ```
 
 **Prerequisites:**
@@ -46,10 +46,10 @@ Credentials resolve as: `--api-key` flag → `PRINTFUL_API_KEY` env → config f
 ```bash
 export PRINTFUL_API_KEY=your-token
 # or
-cli-anything-printful config set api_key your-token
+printful config set api_key your-token
 
 # Verify
-cli-anything-printful --json test
+printful --json test
 ```
 
 Store-level tokens carry their own store context. **Account-level tokens must
@@ -58,9 +58,9 @@ estimates) fails with `This endpoint requires store_id!`:
 
 ```bash
 # Non-interactive: returns the store list rather than prompting
-cli-anything-printful --json store use
+printful --json store use
 # Then set it
-cli-anything-printful --json store use 1135966 --save
+printful --json store use 1135966 --save
 ```
 
 `store use` with no ID prompts interactively **only** when stdin is a terminal.
@@ -71,16 +71,16 @@ never blocks on a prompt.
 
 ```bash
 # Show help
-cli-anything-printful --help
+printful --help
 
 # Interactive REPL (default when no subcommand is given)
-cli-anything-printful
+printful
 
 # JSON output for programmatic use
-cli-anything-printful --json catalog products --limit 5
+printful --json catalog products --limit 5
 
 # Preview a mutation without performing it
-cli-anything-printful --dry-run orders confirm 12345 --yes
+printful --dry-run orders confirm 12345 --yes
 ```
 
 ## Command Groups
@@ -211,50 +211,50 @@ The core read-only workflow. Nothing here creates or charges anything.
 
 ```bash
 # Find a product and a variant
-cli-anything-printful --json catalog products --limit 5
-cli-anything-printful --json catalog variants 71 --limit 5
-cli-anything-printful --json catalog variant-price 4012
+printful --json catalog products --limit 5
+printful --json catalog variants 71 --limit 5
+printful --json catalog variant-price 4012
 
 # Assemble a draft in the session
-cli-anything-printful --json draft recipient --name "Jane Doe" \
+printful --json draft recipient --name "Jane Doe" \
     --address1 "1 Main St" --city Austin --state-code TX \
     --country-code US --zip 78701
-cli-anything-printful --json draft add-item --variant-id 4012 --quantity 2
+printful --json draft add-item --variant-id 4012 --quantity 2
 
 # Rates can be quoted with no artwork yet
-cli-anything-printful --json ship rates
+printful --json ship rates
 
 # Placing the order cannot — add a design first
-cli-anything-printful --json draft add-item --variant-id 4012 --quantity 2 \
+printful --json draft add-item --variant-id 4012 --quantity 2 \
     --image-url https://example.com/art.png
-cli-anything-printful --json orders estimate
+printful --json orders estimate
 ```
 
 ### Place an order
 
 ```bash
 # Creates a DRAFT — not charged
-cli-anything-printful --json draft submit
+printful --json draft submit
 
 # Inspect it
-cli-anything-printful --json orders get 12345678
+printful --json orders get 12345678
 
 # Charge the account — only with the human's explicit go-ahead
-cli-anything-printful --json orders confirm 12345678 --yes
+printful --json orders confirm 12345678 --yes
 ```
 
 ### Generate a mockup
 
 ```bash
-cli-anything-printful --json mockup styles 71
-cli-anything-printful --json mockup create --product-id 71 \
+printful --json mockup styles 71
+printful --json mockup create --product-id 71 \
     --variant-ids 4012,4013 --image-url https://example.com/art.png --wait
 ```
 
 ### Interactive REPL session
 
 ```bash
-cli-anything-printful
+printful
 # `help` lists command groups; `exit` leaves.
 # The prompt shows the draft item count.
 # Billable commands still require --yes inside the REPL.
@@ -299,4 +299,4 @@ cli-anything-printful
 
 ## Version
 
-cli-anything-printful 1.0.0
+printful 1.0.0

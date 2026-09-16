@@ -63,7 +63,7 @@ Issues = "https://github.com/Purple-Horizons/printful-mcp/issues"
 # `python test_server.py`), not pytest modules: they define module-level
 # `async def test_*` with no asyncio mode, so pytest collects them and then
 # fails all 14. Scoping collection to the real suite keeps `pytest` meaningful.
-testpaths = ["src/cli_anything/printful/tests"]
+testpaths = ["src/printful_core/tests", "src/cli_anything/printful/tests", "tests"]
 # Live tests call the real Printful API and need PRINTFUL_API_KEY, so they are
 # not in the default selection — a fresh clone runs the offline suite and gets
 # a clean result. They are NOT softened: when selected without credentials they

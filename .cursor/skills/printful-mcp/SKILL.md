@@ -262,7 +262,7 @@ Retry-After value, because a silent retry is what walks a new store into the
 **printful_get_order**
 - View order details and status
 - Use order ID or @external_id
-- Returns: Full order with items, status, tracking
+- Returns: Order status, recipient, costs and items — no tracking; use `printful_list_order_shipments` for that
 
 **printful_confirm_order**
 - Start production/fulfillment

@@ -37,15 +37,30 @@ are safe to run.
 
 ## Installation
 
+This package is not published to PyPI. Clone the repository and install it:
+
 ```bash
-pip install printful-mcp
+git clone https://github.com/crichalchemist/printful-mcp.git
+cd printful-mcp
+python -m venv .venv
+.venv/bin/pip install -e ".[dev]"
 ```
+
+That installs two console scripts into `.venv/bin/`: `printful-mcp` and `printful`.
+This skill uses `printful`.
+
+**Every runnable command in this skill spells out `.venv/bin/`**, because that is what
+works immediately after the block above — the install does not put anything on your
+`PATH`. If you prefer, `source .venv/bin/activate` once and drop the prefix everywhere;
+the two forms are equivalent, and this document picks the explicit one so nothing depends
+on shell state. (Where a subcommand is named in passing, such as `store use`, it is a name
+rather than something to paste.)
 
 **Prerequisites:**
 - Python 3.10+
 - A Printful API token from <https://www.printful.com/dashboard/api>
 
-There is nothing to install locally beyond the package — Printful is a hosted
+There is nothing to install beyond this repository — Printful is a hosted
 service, not a local application. Note that Printful private tokens **expire and
 cannot be refreshed**; a lapsed token must be regenerated.
 
@@ -56,10 +71,10 @@ Credentials resolve as: `--api-key` flag → `PRINTFUL_API_KEY` env → config f
 ```bash
 export PRINTFUL_API_KEY=your-token
 # or
-printful config set api_key your-token
+.venv/bin/printful config set api_key your-token
 
 # Verify
-printful --json test
+.venv/bin/printful --json test
 ```
 
 Store-level tokens carry their own store context. **Account-level tokens must
@@ -69,9 +84,9 @@ estimates) fails with Printful's own store-scope error, whose text mentions
 
 ```bash
 # Non-interactive: returns the store list rather than prompting
-printful --json store use
+.venv/bin/printful --json store use
 # Then set it
-printful --json store use 23456789 --save
+.venv/bin/printful --json store use 23456789 --save
 ```
 
 `store use` with no ID prompts interactively **only** when stdin is a terminal.
@@ -82,16 +97,16 @@ never blocks on a prompt.
 
 ```bash
 # Show help
-printful --help
+.venv/bin/printful --help
 
 # Interactive REPL (default when no subcommand is given)
-printful
+.venv/bin/printful
 
 # JSON output for programmatic use
-printful --json catalog products --limit 5
+.venv/bin/printful --json catalog products --limit 5
 
 # Preview a mutation without performing it
-printful --dry-run orders confirm 12345 --yes
+.venv/bin/printful --dry-run orders confirm 12345 --yes
 ```
 
 ## Command Groups
@@ -222,50 +237,50 @@ The core read-only workflow. Nothing here creates or charges anything.
 
 ```bash
 # Find a product and a variant
-printful --json catalog products --limit 5
-printful --json catalog variants 71 --limit 5
-printful --json catalog variant-price 4012
+.venv/bin/printful --json catalog products --limit 5
+.venv/bin/printful --json catalog variants 71 --limit 5
+.venv/bin/printful --json catalog variant-price 4012
 
 # Assemble a draft in the session
-printful --json draft recipient --name "Jane Doe" \
+.venv/bin/printful --json draft recipient --name "Jane Doe" \
     --address1 "1 Main St" --city Austin --state-code TX \
     --country-code US --zip 78701
-printful --json draft add-item --variant-id 4012 --quantity 2
+.venv/bin/printful --json draft add-item --variant-id 4012 --quantity 2
 
 # Rates can be quoted with no artwork yet
-printful --json ship rates
+.venv/bin/printful --json ship rates
 
 # Placing the order cannot — add a design first
-printful --json draft add-item --variant-id 4012 --quantity 2 \
+.venv/bin/printful --json draft add-item --variant-id 4012 --quantity 2 \
     --image-url https://example.com/art.png
-printful --json orders estimate
+.venv/bin/printful --json orders estimate
 ```
 
 ### Place an order
 
 ```bash
 # Creates a DRAFT — not charged
-printful --json draft submit
+.venv/bin/printful --json draft submit
 
 # Inspect it
-printful --json orders get 12345678
+.venv/bin/printful --json orders get 12345678
 
 # Charge the account — only with the human's explicit go-ahead
-printful --json orders confirm 12345678 --yes
+.venv/bin/printful --json orders confirm 12345678 --yes
 ```
 
 ### Generate a mockup
 
 ```bash
-printful --json mockup styles 71
-printful --json mockup create --product-id 71 \
+.venv/bin/printful --json mockup styles 71
+.venv/bin/printful --json mockup create --product-id 71 \
     --variant-ids 4012,4013 --image-url https://example.com/art.png --wait
 ```
 
 ### Interactive REPL session
 
 ```bash
-printful
+.venv/bin/printful
 # `help` lists command groups; `exit` leaves.
 # The prompt shows the draft item count.
 # Billable commands still require --yes inside the REPL.
@@ -311,4 +326,4 @@ printful
 
 ## Version
 
-Run `printful --version`.
+Run `.venv/bin/printful --version`.

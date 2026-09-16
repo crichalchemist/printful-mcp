@@ -85,8 +85,9 @@ async def printful_get_product(params: GetProductInput) -> str:
     """
     Get detailed information about a specific catalog product.
 
-    Returns placements (where designs can be printed), techniques (DTG, embroidery, etc.),
-    available sizes/colors, and design requirements.
+    Returns the name, ID, type, brand, variant count, status, description, available
+    techniques (DTG, embroidery, etc.), and the first five placements. For sizes and
+    colors use printful_get_product_variants; for measurements use printful_get_size_guide.
     """
     return await catalog.get_product(get_transport(), params)
 
@@ -106,7 +107,7 @@ async def printful_get_product_variants(params: GetProductVariantsInput) -> str:
     Get all variants (size/color combinations) for a product.
 
     Each variant has a unique ID needed for ordering. Returns variant IDs,
-    names, sizes, colors, and preview images.
+    names, sizes, and colors with their color codes.
     """
     return await catalog.get_product_variants(get_transport(), params)
 
@@ -125,7 +126,7 @@ async def printful_get_variant_prices(params: GetVariantPricesInput) -> str:
     """
     Get pricing information for a specific variant.
 
-    Returns base prices by technique, placement costs, and quantity discounts.
+    Returns the currency, base prices by technique, and additional placement prices.
     Helps calculate total order costs before ordering.
     """
     return await catalog.get_variant_prices(get_transport(), params)
@@ -241,8 +242,9 @@ async def printful_get_order(params: GetOrderInput) -> str:
     """
     Get details of a specific order.
 
-    Returns order status, recipient, costs, items, and shipment info.
+    Returns order status, recipient, costs, and items.
     Use order ID or external ID (prefix with @).
+    For shipments and tracking, use printful_list_order_shipments.
     """
     return await orders.get_order(get_transport(), params)
 

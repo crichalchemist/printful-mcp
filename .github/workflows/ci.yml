@@ -70,6 +70,9 @@ jobs:
     # fork gets a red badge for a job that was never theirs to run.
     # PRINTFUL_E2E_MOCKUPS is deliberately absent, so mockup creation stays
     # skipped and the 60-second Printful lockout is never provoked.
+    # This selects the whole live suite, so TestLiveDraftOrder creates and
+    # cancels a real draft order every week. Nothing is charged -- a draft is
+    # not a confirmed order, and no live test reaches confirm_order.
     if: github.event_name == 'schedule' && github.repository == 'crichalchemist/printful-mcp'
     runs-on: ubuntu-latest
     steps:

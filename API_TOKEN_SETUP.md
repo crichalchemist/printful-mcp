@@ -37,16 +37,23 @@ Scopes control what the API token can do. Here's what you need:
 
 ### ✅ Orders: "View and manage all orders"
 **Why needed:**
-- Create draft orders
-- View order status
+- Create, update and cancel draft orders
+- View order status, items and shipments
 - Confirm orders for fulfillment
 - List all orders
+- Run cost-estimation tasks
 
-**Tools that need this:**
+**Tools that need this** — every tool calling `/orders…` or `/order-estimation-tasks`:
 - `printful_create_order`
 - `printful_get_order`
+- `printful_update_order`
+- `printful_cancel_order`
 - `printful_confirm_order`
 - `printful_list_orders`
+- `printful_list_order_items`
+- `printful_list_order_shipments`
+- `printful_create_estimation_task`
+- `printful_get_estimation_task`
 
 ### ✅ Store Information: "View all store information"
 **Why needed:**
@@ -64,10 +71,11 @@ Scopes control what the API token can do. Here's what you need:
 - Retrieve file information
 - Generate mockups with custom designs
 
-**Tools that need this:**
+**Tools that need this** — every tool calling `/files…` or `/mockup-tasks`:
 - `printful_add_file`
 - `printful_get_file`
 - `printful_create_mockup_task`
+- `printful_get_mockup_task`
 
 ---
 
@@ -99,23 +107,37 @@ Scopes control what the API token can do. Here's what you need:
 ### ⚪ Product Templates: "View product templates"
 **Why needed:**
 - Legacy v1 API feature
-- Not commonly used
-- Product templates are being deprecated
+- Used by exactly one tool, `printful_list_store_templates`, which calls
+  `GET /product-templates`
 
-**Recommendation:** Skip unless you specifically need this
+**Recommendation:** Skip unless you use that tool. Note that this repository does not
+verify which Printful scope governs `/product-templates` — that needs a live call with
+the scope withheld, which nothing here performs.
+
+---
+
+## The Tools No Scope Above Governs
+
+The catalog, geography, shipping-rate and tax tools do not read store-owned data, so none
+of the scopes above is written for them. They are not listed here one by one on purpose:
+**`API_SCOPES_REFERENCE.md` carries the complete tool→endpoint map for all 32 registered
+tools**, derived from the `@mcp.tool` registrations in `src/printful_mcp/server.py` and
+the request builders in `src/printful_core/endpoints/`. Keep that map current when a tool
+is added; this document describes what each scope buys, not the full roster.
 
 ---
 
 ## Scope Combinations by Use Case
 
 ### Use Case 1: Full Functionality (Recommended)
-**Perfect for:** Complete access to all features
+**Perfect for:** Everything except product templates — 31 of the 32 tools
 
 ```
 ✅ View and manage all orders
 ✅ View all store information  
 ✅ View and manage all store files
 ✅ View all store products
+⚪ View product templates (only for `printful_list_store_templates`)
 ```
 
 ### Use Case 2: Read-Only Testing
@@ -324,6 +346,7 @@ Scopes:
 ✅ View all store information
 ✅ View and manage all store files
 ✅ View all store products
+⚪ View product templates (only for printful_list_store_templates)
 
 Security:
 🔒 Store in .env file (never commit)

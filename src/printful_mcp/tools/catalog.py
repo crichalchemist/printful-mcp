@@ -47,8 +47,9 @@ async def get_product(transport: AsyncTransport, params: GetProductInput) -> str
     """
     Get detailed information about a specific catalog product.
 
-    Returns full product details including placements, techniques, design options,
-    available sizes, colors, and product options.
+    Returns the name, ID, type, brand, variant count, status, description, available
+    techniques, and the first five placements. Sizes and colors come from
+    get_product_variants; measurements from get_size_guide.
     """
     try:
         data = await transport.send(catalog.get_product(params.product_id))
@@ -63,7 +64,7 @@ async def get_product_variants(transport: AsyncTransport, params: GetProductVari
     """
     Get all variants (size/color combinations) for a catalog product.
 
-    Returns variant IDs, names, sizes, colors, and images needed for ordering.
+    Returns the variant IDs, names, sizes, and colors needed for ordering.
     """
     try:
         request = catalog.list_variants(params.product_id, limit=params.limit, offset=params.offset)
@@ -79,7 +80,7 @@ async def get_variant_prices(transport: AsyncTransport, params: GetVariantPrices
     """
     Get pricing information for a specific catalog variant.
 
-    Returns prices for different techniques, placements, and quantity discounts.
+    Returns the currency, base prices by technique, and additional placement prices.
     """
     try:
         request = catalog.get_variant_prices(params.variant_id, currency=params.currency)

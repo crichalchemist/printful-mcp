@@ -3,6 +3,7 @@ from printful_mcp.models.inputs import (
     CreateMockupTaskInput,
     GetMockupTaskInput,
     ListMockupStylesInput,
+    ListMockupTemplatesInput,
 )
 from printful_mcp.tools import mockups
 
@@ -62,3 +63,27 @@ async def test_a_missing_task_says_so(transport):
 async def test_styles_are_fetched_per_product(transport):
     await mockups.list_mockup_styles(transport, ListMockupStylesInput(product_id=71))
     assert transport.last.path == "/catalog-products/71/mockup-styles"
+
+
+async def test_templates_are_fetched_per_product_and_rendered(transport):
+    """Wiring this to the wrong `list_templates` returns a valid-looking Request
+    for the wrong collection.
+
+    `mockups.list_templates(product_id)` shares a name with
+    `stores.list_templates(limit, offset)` but not a signature or a target
+    collection. And `markdown.mockup_templates` reads every field through
+    `.get()`, so a broken renderer would not raise on a sparse response body —
+    only an assertion on an actual rendered value catches it.
+    """
+    transport._responses.append({"data": [{
+        "id": 5,
+        "placement": "front",
+        "technique": "dtg",
+        "print_area_width": 1800,
+        "print_area_height": 2400,
+        "image_url": "https://example.com/template.png",
+    }]})
+    out = await mockups.list_mockup_templates(
+        transport, ListMockupTemplatesInput(product_id=71))
+    assert transport.last.path == "/catalog-products/71/mockup-templates"
+    assert "1800x2400" in out

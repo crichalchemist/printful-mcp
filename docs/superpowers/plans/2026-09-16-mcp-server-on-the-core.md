@@ -3391,7 +3391,20 @@ count.** If you cannot point at the successor test, do not delete the test.
 
 - [ ] **Step 4: Write the tests that pin the parity target**
 
-Create `src/printful_mcp/tests/test_server.py`:
+**First, delete `src/printful_mcp/tests/test_server_annotations.py`.** Task 4
+created it to close a real gap: its mutation table found that setting
+`destructiveHint: False` on `printful_cancel_order` broke no test, and leaving
+that unguarded for five tasks was the worse option. This file is where that
+assertion belongs, and `test_the_tools_that_spend_money_are_marked_destructive`
+below covers it for both destructive tools rather than one. Confirm the new test
+fails under the same mutation before deleting the interim file — if it does not,
+keep the interim file and report that instead.
+
+```bash
+rtk proxy git rm src/printful_mcp/tests/test_server_annotations.py
+```
+
+Then create `src/printful_mcp/tests/test_server.py`:
 
 ```python
 """The server's registration surface.

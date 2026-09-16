@@ -1,3 +1,5 @@
+.remember/
+.serena/
 # Python
 __pycache__/
 *.py[cod]

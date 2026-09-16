@@ -231,8 +231,8 @@ Live artifacts printed during the run:
   Stores: [(12345678, 'Example Store'), (23456789, 'Example Store 2'), (34567890, 'Example Store 3')]
   404 surfaced as: Product 99999999 does not exist or is inactive.
   Rates: [('Flat Rate (Estimated delivery: Sep 23–25) ', '4.95', 'USD')]
-  Draft order created: 176657491
-  Draft order 176657491 cancelled (cleanup)
+  Draft order created: 987654321
+  Draft order 987654321 cancelled (cleanup)
   Estimated total: 20.43 USD
 ```
 

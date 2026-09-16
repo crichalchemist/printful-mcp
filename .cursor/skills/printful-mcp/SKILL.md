@@ -180,7 +180,7 @@ Mockup creation: 10 per 60s for established stores, 2 per 60s for NEW stores,
   account per 24 hours
 ```
 
-**6. Treat a rate-limit error as final, not as a prompt to retry**
+**4. Treat a rate-limit error as final, not as a prompt to retry**
 ```
 ❌ Catching the error and calling again
 ✅ Reporting it to the user with the wait time from the message
@@ -189,7 +189,7 @@ Retry-After value, because a silent retry is what walks a new store into the
 60-second mockup lockout.
 ```
 
-**4. Store ID is NOT required for most operations**
+**5. Store ID is NOT required for most operations**
 ```
 ✅ Catalog, orders, mockups, shipping, files → No store_id needed
 ✅ Only printful_get_store_stats requires store_id as a parameter
@@ -202,23 +202,28 @@ Retry-After value, because a silent retry is what walks a new store into the
 ### 🛍️ Catalog Tools
 
 **printful_list_catalog_products**
-- Browse 300+ products with filters
-- Filter by: type, category, technique, brand
-- Returns: Product list with IDs, names, images, prices
+- Browse the catalog with filters
+- Optional: `limit` (default 20, max 100), `offset`, and the comma-separated filters `category_ids`, `colors`, `techniques`, `types`
+- ⚠️ **There is no brand filter.** Those four are the only filters that exist, and an unrecognized one is *silently ignored* rather than rejected — so a misspelled or invented filter returns a full, unfiltered list that looks exactly like a filtered one
+- Returns: Product list with IDs, names, types, variant counts and techniques — no images and no prices (use `printful_get_variant_prices` for pricing)
 
 **printful_get_product**
 - Detailed product information
-- Includes: Placements, techniques, available files
+- Required: `product_id`
+- Returns: Name, ID, type, brand, variant count, status, description, available techniques, and placements
 - Use: When user wants deep product details
 
 **printful_get_product_variants**
 - All size/color combinations
-- Returns: Variant IDs, names, dimensions
+- Required: `product_id`
+- Optional: `limit`, `offset`
+- Returns: Variant IDs, names, sizes and colors
 - Use: "What sizes are available?"
 
 **printful_get_variant_prices**
 - Pricing by currency
-- Supports: USD, EUR, GBP, CAD, etc.
+- Required: `variant_id`
+- Optional: `currency` (e.g. USD, EUR, GBP, CAD)
 - Use: "How much in euros?"
 
 **printful_get_product_availability**

@@ -10,13 +10,17 @@ API. Browse the catalog, build and place orders, calculate shipping, and generat
 mockups from the shell or from an agent — with a REPL for multi-step work.
 
 The backend is the hosted Printful REST API (v2, with v1 fallback for tax, product
-templates, and sync products). Most commands make a live API call. The purely
-local exceptions are the `draft`, `session` and `config` groups and `files list`.
+templates, and sync products). Most commands make a live API call. The purely local
+exceptions are the `session` and `config` groups, `files list`, and the `draft`
+group **except `draft submit`** — building a draft is local, but submitting it
+posts the order to Printful (it creates a DRAFT, so nothing is charged).
 
 `--dry-run` suppresses the call for the commands that *write*: `orders create`,
-`update`, `cancel`, `confirm` and `estimate`, plus `mockup create` and `files add`.
+`update`, `cancel`, `confirm` and `estimate`, plus `mockup create` and `files add`
+— and `draft submit`, which routes through `orders create`'s gate.
 It does not make read commands offline — `catalog products --dry-run` still queries
-the API.
+the API. It also skips the session auto-save, so a dry run leaves no trace in the
+session file.
 
 ## ⚠️ Read this before running any command
 
@@ -60,7 +64,8 @@ printful --json test
 
 Store-level tokens carry their own store context. **Account-level tokens must
 select a store** or every store-scoped endpoint (orders, shipping rates,
-estimates) fails with `This endpoint requires store_id!`:
+estimates) fails with Printful's own store-scope error, whose text mentions
+`store_id`:
 
 ```bash
 # Non-interactive: returns the store list rather than prompting
@@ -294,9 +299,10 @@ printful
    `priceable` (enough to quote shipping) and `complete` (enough to place the order),
    with `items_without_design` counting what still needs a design. Check `missing`
    before calling `draft submit`; it names the exact command to fix each gap.
-10. **Select a store first on an account-level token.** If a call returns
-    `This endpoint requires store_id!`, the error carries a `hint` field with the
-    command to fix it. Run `--json store use` to list stores, then
+10. **Select a store first on an account-level token.** Whenever Printful's error
+    message mentions `store_id`, the CLI adds a `hint` field carrying the command
+    to fix it — the match is on that substring, so the wording of Printful's own
+    message does not matter. Run `--json store use` to list stores, then
     `store use <ID> --save`.
 11. **Trust the error text.** API errors surface Printful's own message (the v2 API
     does not use the RFC 9457 shape its docs describe; this CLI reads both). A

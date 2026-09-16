@@ -26,6 +26,8 @@ from .models.inputs import (
     CancelOrderInput,
     ListOrderItemsInput,
     ListOrderShipmentsInput,
+    CreateEstimationTaskInput,
+    GetEstimationTaskInput,
     CalculateShippingInput,
     CreateMockupTaskInput,
     GetMockupTaskInput,
@@ -369,6 +371,41 @@ async def printful_list_order_shipments(params: ListOrderShipmentsInput) -> str:
     List the shipments for an order, with tracking numbers.
     """
     return await orders.list_order_shipments(get_transport(), params)
+
+
+@mcp.tool(
+    name="printful_create_estimation_task",
+    annotations={
+        "title": "Start Cost Estimate",
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": False,
+        "openWorldHint": True,
+    }
+)
+async def printful_create_estimation_task(params: CreateEstimationTaskInput) -> str:
+    """
+    Start a cost estimate for a would-be order. Returns a task ID immediately;
+    read the result with printful_get_estimation_task.
+    """
+    return await orders.create_estimation_task(get_transport(), params)
+
+
+@mcp.tool(
+    name="printful_get_estimation_task",
+    annotations={
+        "title": "Get Cost Estimate",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    }
+)
+async def printful_get_estimation_task(params: GetEstimationTaskInput) -> str:
+    """
+    Read a cost estimate. Returns pending, failed, or the calculated costs.
+    """
+    return await orders.get_estimation_task(get_transport(), params)
 
 
 # ========== SHIPPING TOOLS ==========

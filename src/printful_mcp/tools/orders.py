@@ -2,6 +2,7 @@
 
 import json
 
+from printful_core import polling
 from printful_core.endpoints import orders
 from printful_core.errors import PrintfulError
 from printful_core.format import markdown
@@ -10,7 +11,9 @@ from printful_core.transport import AsyncTransport
 from ..models.inputs import (
     CancelOrderInput,
     ConfirmOrderInput,
+    CreateEstimationTaskInput,
     CreateOrderInput,
+    GetEstimationTaskInput,
     GetOrderInput,
     ListOrderItemsInput,
     ListOrdersInput,
@@ -183,5 +186,67 @@ async def list_order_shipments(transport: AsyncTransport,
         if params.format == "json":
             return json.dumps(data, indent=2)
         return markdown.shipments(data, params.order_id)
+    except PrintfulError as e:
+        return f"Error: {e.message}"
+
+
+async def create_estimation_task(transport: AsyncTransport,
+                                 params: CreateEstimationTaskInput) -> str:
+    """
+    Start a cost estimate for a would-be order.
+
+    Returns a task ID immediately. Read the result with
+    printful_get_estimation_task. Artwork is not required to estimate costs.
+    """
+    recipient = {"country_code": params.recipient_country_code}
+    if params.recipient_state_code:
+        recipient["state_code"] = params.recipient_state_code
+    if params.recipient_city:
+        recipient["city"] = params.recipient_city
+    if params.recipient_zip:
+        recipient["zip"] = params.recipient_zip
+
+    try:
+        items = json.loads(params.items_json)
+    except json.JSONDecodeError as e:
+        return f"Error: items_json must be valid JSON array ({e})."
+    if not isinstance(items, list) or not items:
+        return "Error: items_json must be a non-empty JSON array of order items."
+
+    try:
+        request = orders.create_estimation_task(recipient, items)
+        data = await transport.send(request)
+        if params.format == "json":
+            return json.dumps(data, indent=2)
+        body = polling.task_body(data)
+        return (f"Estimation task created.\n\nTask ID: {body.get('id')}\n"
+                f"Status: {body.get('status')}\n\n"
+                "Read the result with printful_get_estimation_task.")
+    except ValueError as e:
+        return f"Error: {e}"
+    except PrintfulError as e:
+        return f"Error: {e.message}"
+
+
+async def get_estimation_task(transport: AsyncTransport,
+                              params: GetEstimationTaskInput) -> str:
+    """
+    Read a cost estimate started by printful_create_estimation_task.
+
+    Returns pending, failed, or the calculated costs. Call again after a few
+    seconds while it is pending.
+
+    This is a separate tool rather than a wait inside the create call because
+    the core's polling drivers sleep against a deadline. Awaiting one here
+    would hold the tool call open for the whole timeout, and a client that
+    gave up would have created a task it could never read. The mockup tools
+    are split for the same reason.
+    """
+    try:
+        data = await transport.send(orders.get_estimation_task(params.task_id))
+        if params.format == "json":
+            return json.dumps(data, indent=2)
+        body = polling.task_body(data)
+        return markdown.estimate(body, polling.classify_task(body))
     except PrintfulError as e:
         return f"Error: {e.message}"

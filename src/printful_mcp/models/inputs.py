@@ -227,3 +227,28 @@ class GetStoreStatsInput(BaseModel):
     )
     currency: Optional[str] = Field(default=None, description="Currency code")
     format: Literal["markdown", "json"] = Field(default="markdown", description="Output format")
+
+
+# Estimation Models
+class CreateEstimationTaskInput(BaseModel):
+    """Input for printful_create_estimation_task."""
+    recipient_country_code: str = Field(description="Destination country code, e.g. US")
+    recipient_state_code: Optional[str] = Field(
+        default=None, description="State code (required for US, CA, AU)")
+    recipient_city: Optional[str] = Field(default=None, description="Destination city")
+    recipient_zip: Optional[str] = Field(default=None, description="Destination ZIP")
+    items_json: str = Field(
+        description=(
+            "JSON array of order items. Example: "
+            '[{"source":"catalog","catalog_variant_id":4012,"quantity":1}]'
+        ),
+    )
+    format: Literal["markdown", "json"] = Field(
+        default="markdown", description="Response format")
+
+
+class GetEstimationTaskInput(BaseModel):
+    """Input for printful_get_estimation_task."""
+    task_id: str = Field(description="Task ID returned by printful_create_estimation_task")
+    format: Literal["markdown", "json"] = Field(
+        default="markdown", description="Response format")

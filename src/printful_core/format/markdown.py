@@ -295,3 +295,30 @@ def shipments(data: Dict[str, Any], order_id: str) -> str:
             f"",
         ])
     return "\n".join(lines)
+
+
+def estimate(body: Dict[str, Any], status: str) -> str:
+    """One estimation task, in whichever state it is in."""
+    if status == "pending":
+        return ("# Cost Estimate\n\n**Status:** pending\n\n"
+                "The estimate is still being calculated. Call "
+                "printful_get_estimation_task again in a few seconds.")
+    if status == "failed":
+        reasons = body.get("failure_reasons") or []
+        detail = "\n".join(f"- {r}" for r in reasons) or "- No reason given."
+        return f"# Cost Estimate\n\n**Status:** failed\n\n{detail}"
+
+    costs = (body.get("costs") or {})
+    currency = costs.get("currency", "")
+    lines = [
+        f"# Cost Estimate",
+        f"",
+        f"**Status:** completed",
+        f"**Currency:** {currency}",
+        f"**Subtotal:** {costs.get('subtotal', 'N/A')}",
+        f"**Shipping:** {costs.get('shipping', 'N/A')}",
+        f"**Tax:** {costs.get('tax', 'N/A')}",
+        f"**Total:** {costs.get('total', 'N/A')}",
+        f"",
+    ]
+    return "\n".join(lines)

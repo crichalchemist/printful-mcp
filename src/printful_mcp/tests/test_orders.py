@@ -5,7 +5,9 @@ from printful_core.errors import PrintfulError
 from printful_mcp.models.inputs import (
     CancelOrderInput,
     ConfirmOrderInput,
+    CreateEstimationTaskInput,
     CreateOrderInput,
+    GetEstimationTaskInput,
     ListOrderItemsInput,
     ListOrderShipmentsInput,
     ListOrdersInput,
@@ -162,3 +164,53 @@ async def test_order_items_show_the_variant_and_quantity_needed_to_reorder(trans
     assert transport.last.path == "/orders/42/order-items"
     assert "**Variant:** 4012" in out
     assert "**Quantity:** 3" in out
+
+
+async def test_a_pending_estimate_tells_the_caller_to_come_back(transport):
+    """A pending task must not render as an estimate of zero.
+
+    `classify_task` returns "pending" for anything that is neither completed
+    nor failed, and the costs block is absent in that state.
+    """
+    transport._responses.append({"data": {"id": "t1", "status": "pending"}})
+    out = await orders.get_estimation_task(transport, GetEstimationTaskInput(task_id="t1"))
+    assert "pending" in out
+    assert "printful_get_estimation_task again" in out
+
+
+async def test_a_list_shaped_task_body_is_unwrapped(transport):
+    """The API returns this task as a one-element list, not an object.
+
+    `task_body` handles both. A tool that read `data` directly would render a
+    list where a dict is expected and report every estimate as pending.
+    """
+    transport._responses.append(
+        {"data": [{"id": "t2", "status": "completed",
+                   "costs": {"currency": "USD", "total": "24.95"}}]})
+    out = await orders.get_estimation_task(transport, GetEstimationTaskInput(task_id="t2"))
+    assert "completed" in out
+    assert "24.95" in out
+
+
+async def test_a_failed_estimate_reports_why(transport):
+    transport._responses.append(
+        {"data": {"id": "t3", "status": "failed",
+                  "failure_reasons": ["No shipping to that country"]}})
+    out = await orders.get_estimation_task(transport, GetEstimationTaskInput(task_id="t3"))
+    assert "failed" in out
+    assert "No shipping to that country" in out
+
+
+async def test_estimation_does_not_require_artwork(transport):
+    """Rates can be quoted for an item with no placements.
+
+    Order creation rejects such an item; estimation does not. Adding a
+    placements check here would break a working path -- this was confirmed
+    against the live API, not assumed.
+    """
+    items = [{"source": "catalog", "catalog_variant_id": 4012, "quantity": 1}]
+    out = await orders.create_estimation_task(transport, CreateEstimationTaskInput(
+        recipient_country_code="US", recipient_state_code="CA",
+        items_json=json.dumps(items)))
+    assert not out.startswith("Error:")
+    assert transport.last.path == "/order-estimation-tasks"

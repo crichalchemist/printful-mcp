@@ -256,6 +256,14 @@ class GetStoreStatsInput(BaseModel):
     format: Literal["markdown", "json"] = Field(default="markdown", description="Output format")
 
 
+class ListStoreTemplatesInput(BaseModel):
+    """Input for printful_list_store_templates."""
+    limit: int = Field(default=20, ge=1, le=100, description="Templates per page")
+    offset: int = Field(default=0, ge=0, description="Pagination offset")
+    format: Literal["markdown", "json"] = Field(
+        default="markdown", description="Response format")
+
+
 # Estimation Models
 class CreateEstimationTaskInput(BaseModel):
     """Input for printful_create_estimation_task."""

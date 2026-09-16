@@ -434,3 +434,219 @@ def mockup_templates(data: Dict[str, Any], product_id: int) -> str:
             f"",
         ])
     return "\n".join(lines)
+
+
+def file_added(body: Dict[str, Any]) -> str:
+    """A file just added to the library, possibly still processing."""
+    lines = [
+        f"# File Added to Library",
+        f"",
+        f"**File ID:** {body['id']}",
+        f"**Status:** {body['status']}",
+        f"**Filename:** {body.get('filename', 'Pending')}",
+        f"**Original URL:** {body['url']}",
+        f"",
+    ]
+
+    if body['status'] == 'ok':
+        lines.extend([
+            f"**Dimensions:** {body.get('width')}x{body.get('height')}px",
+            f"**DPI:** {body.get('dpi')}",
+            f"**Size:** {body.get('size')} bytes",
+            f"**Preview:** {body.get('preview_url')}",
+            f"",
+        ])
+    elif body['status'] == 'waiting':
+        lines.append("⏳ File is being processed. Check status with printful_get_file.")
+
+    return "\n".join(lines)
+
+
+def file_detail(body: Dict[str, Any]) -> str:
+    """One file's full detail, branching on its processing status."""
+    lines = [
+        f"# File {body['id']}",
+        f"",
+        f"**Status:** {body['status']}",
+        f"**Filename:** {body.get('filename', 'N/A')}",
+        f"**MIME Type:** {body.get('mime_type', 'N/A')}",
+        f"**Created:** {body['created']}",
+        f"",
+    ]
+
+    if body['status'] == 'ok':
+        lines.extend([
+            "## File Details",
+            f"- **Dimensions:** {body.get('width')}x{body.get('height')}px",
+            f"- **DPI:** {body.get('dpi')}",
+            f"- **Size:** {body.get('size')} bytes",
+            f"- **Hash:** {body.get('hash')}",
+            f"",
+            "## URLs",
+            f"- **Original:** {body['url']}",
+            f"- **Thumbnail:** {body.get('thumbnail_url')}",
+            f"- **Preview:** {body.get('preview_url')}",
+            f"",
+        ])
+    elif body['status'] == 'waiting':
+        lines.append("⏳ File is still being processed.")
+    elif body['status'] == 'failed':
+        lines.append("❌ File processing failed. The file may be invalid or inaccessible.")
+
+    return "\n".join(lines)
+
+
+def stores(data: Dict[str, Any]) -> str:
+    """The stores available to the API token."""
+    stores = data.get('data', [])
+
+    lines = [
+        f"# Stores ({len(stores)} total)",
+        f"",
+    ]
+
+    for store in stores:
+        lines.extend([
+            f"## {store['name']}",
+            f"- **ID:** {store['id']}",
+            f"- **Type:** {store['type']}",
+            f"",
+        ])
+
+    return "\n".join(lines)
+
+
+def store_statistics(data: Dict[str, Any], date_from: str, date_to: str) -> str:
+    """Store statistics for a date range.
+
+    `date_from`/`date_to` are arguments, not fields in the response body, for
+    the same reason `mockup_styles`/`mockup_templates` take `product_id`: the
+    identifier printed in the header is the one that was asked for, and the
+    body does not carry it back.
+    """
+    stats = data.get('data', {})
+    currency = stats.get('currency', 'USD')
+
+    lines = [
+        f"# Store Statistics ({date_from} to {date_to})",
+        f"",
+        f"**Store ID:** {stats.get('store_id')}",
+        f"**Currency:** {currency}",
+        f"",
+    ]
+
+    # Profit
+    if stats.get('profit'):
+        profit = stats['profit']
+        lines.extend([
+            "## Profit",
+            f"**Value:** {profit['value']} {currency}",
+            f"**Change:** {profit.get('relative_difference', 'N/A')}",
+            f"",
+        ])
+
+    # Total orders
+    if stats.get('total_paid_orders'):
+        orders = stats['total_paid_orders']
+        lines.extend([
+            "## Total Paid Orders",
+            f"**Count:** {orders['value']}",
+            f"**Change:** {orders.get('relative_difference', 'N/A')}",
+            f"",
+        ])
+
+    # Printful costs
+    if stats.get('printful_costs'):
+        costs = stats['printful_costs']
+        lines.extend([
+            "## Printful Costs",
+            f"**Value:** {costs['value']} {currency}",
+            f"**Change:** {costs.get('relative_difference', 'N/A')}",
+            f"",
+        ])
+
+    # Average fulfillment time
+    if stats.get('average_fulfillment_time'):
+        fulfill = stats['average_fulfillment_time']
+        lines.extend([
+            "## Average Fulfillment Time",
+            f"**Days:** {fulfill['value']}",
+            f"**Change:** {fulfill.get('relative_difference', 'N/A')}",
+            f"",
+        ])
+
+    return "\n".join(lines)
+
+
+def store_templates(data: Dict[str, Any]) -> str:
+    """A page of saved product templates."""
+    rows = data.get('data', [])
+    paging = data.get('paging', {})
+    lines = [
+        f"# Product Templates ({paging.get('total', 0)} total)",
+        f"",
+        f"Showing {len(rows)} templates",
+        f"",
+    ]
+    for row in rows:
+        lines.extend([
+            f"## {row.get('title', 'Template')} — ID {row.get('id')}",
+            f"- **Product ID:** {row.get('catalog_product_id', 'N/A')}",
+            f"- **Created:** {row.get('created_at', 'N/A')}",
+            f"",
+        ])
+    return "\n".join(lines)
+
+
+def sync_products(data: Dict[str, Any]) -> str:
+    """A page of v1 sync products. `data` is the v1 result, already unwrapped."""
+    products = data if isinstance(data, list) else []
+
+    lines = [
+        f"# Sync Products ({len(products)} shown)",
+        f"",
+        f"**Note:** Using v1 API (sync products not yet in v2)",
+        f"",
+    ]
+
+    for product in products:
+        lines.extend([
+            f"## {product.get('name', 'Unnamed')}",
+            f"- **Sync Product ID:** {product['id']}",
+            f"- **Sync Variants:** {len(product.get('sync_variants', []))}",
+            f"- **External ID:** {product.get('external_id', 'N/A')}",
+            f"",
+        ])
+
+    return "\n".join(lines)
+
+
+def sync_product(body: Dict[str, Any]) -> str:
+    """One v1 sync product with its variants."""
+    product = body.get('sync_product', {})
+    variants = body.get('sync_variants', [])
+
+    lines = [
+        f"# {product.get('name', 'Sync Product')}",
+        f"",
+        f"**Sync Product ID:** {product['id']}",
+        f"**External ID:** {product.get('external_id', 'N/A')}",
+        f"**Thumbnail:** {product.get('thumbnail_url', 'N/A')}",
+        f"",
+        f"**Note:** Using v1 API (sync products not yet in v2)",
+        f"",
+    ]
+
+    if variants:
+        lines.append(f"## Sync Variants ({len(variants)})")
+        for variant in variants:
+            lines.extend([
+                f"### Variant {variant['id']}",
+                f"- **Name:** {variant.get('name', 'N/A')}",
+                f"- **External ID:** {variant.get('external_id', 'N/A')}",
+                f"- **Variant ID:** {variant.get('variant_id', 'N/A')}",
+                f"- **Retail Price:** {variant.get('retail_price', 'N/A')} {variant.get('currency', '')}",
+                f"",
+            ])
+
+    return "\n".join(lines)

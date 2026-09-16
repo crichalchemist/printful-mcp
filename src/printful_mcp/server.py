@@ -38,6 +38,7 @@ from .models.inputs import (
     GetFileInput,
     ListStoresInput,
     GetStoreStatsInput,
+    ListStoreTemplatesInput,
 )
 from .tools import catalog, orders, shipping, mockups, files, stores, sync
 from .tools.sync import ListSyncProductsInput, GetSyncProductInput
@@ -566,7 +567,7 @@ async def printful_add_file(params: AddFileInput) -> str:
     Uploads file from URL for reuse across orders. Files are processed
     asynchronously. Returns file ID for use in orders.
     """
-    return await files.add_file(get_client(), params)
+    return await files.add_file(get_transport(), params)
 
 
 @mcp.tool(
@@ -586,7 +587,7 @@ async def printful_get_file(params: GetFileInput) -> str:
     Returns file status, dimensions, DPI, and URLs. Check processing
     status before using in orders.
     """
-    return await files.get_file(get_client(), params)
+    return await files.get_file(get_transport(), params)
 
 
 # ========== STORE TOOLS ==========
@@ -607,7 +608,7 @@ async def printful_list_stores(params: ListStoresInput) -> str:
     
     Returns store IDs and names. Needed for multi-store accounts.
     """
-    return await stores.list_stores(get_client(), params)
+    return await stores.list_stores(get_transport(), params)
 
 
 @mcp.tool(
@@ -627,7 +628,24 @@ async def printful_get_store_stats(params: GetStoreStatsInput) -> str:
     Returns sales, costs, profit, order counts, and fulfillment metrics.
     Date range cannot exceed 6 months.
     """
-    return await stores.get_store_statistics(get_client(), params)
+    return await stores.get_store_statistics(get_transport(), params)
+
+
+@mcp.tool(
+    name="printful_list_store_templates",
+    annotations={
+        "title": "List Product Templates",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    }
+)
+async def printful_list_store_templates(params: ListStoreTemplatesInput) -> str:
+    """
+    List the store's saved product templates.
+    """
+    return await stores.list_store_templates(get_transport(), params)
 
 
 # ========== V1 FALLBACK TOOLS ==========
@@ -649,7 +667,7 @@ async def printful_list_sync_products(params: ListSyncProductsInput) -> str:
     Sync products are pre-configured templates with saved designs.
     Currently only available via v1 API.
     """
-    return await sync.list_sync_products(get_client(), params)
+    return await sync.list_sync_products(get_transport(), params)
 
 
 @mcp.tool(
@@ -669,7 +687,7 @@ async def printful_get_sync_product(params: GetSyncProductInput) -> str:
     Returns full sync product info including variants and designs.
     Currently only available via v1 API.
     """
-    return await sync.get_sync_product(get_client(), params)
+    return await sync.get_sync_product(get_transport(), params)
 
 
 def main():

@@ -60,7 +60,7 @@ estimates) fails with `This endpoint requires store_id!`:
 # Non-interactive: returns the store list rather than prompting
 printful --json store use
 # Then set it
-printful --json store use 1135966 --save
+printful --json store use 23456789 --save
 ```
 
 `store use` with no ID prompts interactively **only** when stdin is a terminal.

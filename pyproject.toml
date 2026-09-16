@@ -48,7 +48,12 @@ dependencies = [
 dev = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
-    "ruff>=0.1.0",
+    # Upper bound is required, not cautious: CI runs `ruff format --check` as a
+    # gate, and ruff is pre-1.0, so a 0.x minor bump can reformat files nobody
+    # touched and turn CI red on someone else's release date. Held to the same
+    # minor .pre-commit-config.yaml pins (v0.16.7) so the two gates agree;
+    # patch releases still flow.
+    "ruff>=0.16.7,<0.17",
 ]
 
 [project.urls]

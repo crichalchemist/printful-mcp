@@ -145,9 +145,8 @@ single most common reason a working install does not start under an MCP client:
 
 For Cursor that file is `~/.cursor/mcp.json`; for Claude Desktop it is
 `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS.
-`cursor-mcp-config.json` in this repository is an older sample of the same entry. It uses a bare
-`"command": "python"` with a `cwd` — the exact `PATH` trap described above — so change the
-command to an absolute path before using it.
+`cursor-mcp-config.json` in this repository is that same entry as a file you can copy: fill in
+the absolute path to your checkout and your key.
 
 ### Option 4 — Codex
 
@@ -581,8 +580,8 @@ export PRINTFUL_API_KEY=your-key
 ```
 
 *Not run here — it launches an interactive browser UI.* Note that the script spawns a bare
-`python -m printful_mcp`, so it hits the same `PATH` trap as `cursor-mcp-config.json` above:
-either activate the venv first, or edit the script to use `.venv/bin/python`.
+`python -m printful_mcp`, so it hits the `PATH` trap described above: either activate the venv
+first, or edit the script to use `.venv/bin/python`.
 
 [CLAUDE.md](CLAUDE.md) carries the full working notes for this repository.
 

@@ -3658,49 +3658,56 @@ def _require_credentials():
 
 
 @pytest.fixture
-def transport():
+def live_transport():
+    """The real transport.
+
+    Deliberately NOT named `transport`. conftest.py defines a `transport`
+    fixture that yields a FakeTransport, and a module-local fixture of the same
+    name silently shadows it -- so a test moved out of this file would keep
+    hitting the live API under a name that reads as a fake.
+    """
     _require_credentials()
     return get_transport()
 
 
-async def test_the_country_list_contains_the_united_states(transport):
+async def test_the_country_list_contains_the_united_states(live_transport):
     """The defect this plan fixes, checked where it actually lived.
 
     A single unpaginated request returns the first page only, and `US` is not
     in it. An offline test can prove the tool calls collect_pages_async; only
     this can prove the result is the whole collection.
     """
-    out = await shipping.list_countries(transport)
+    out = await shipping.list_countries(live_transport)
     assert "United States" in out
     assert "(US)" in out
 
 
-async def test_a_v2_error_says_what_went_wrong(transport):
+async def test_a_v2_error_says_what_went_wrong(live_transport):
     """Every v2 error used to arrive as 'Unknown error'.
 
     Product 99999999 does not exist -- a deliberately invalid ID, not a real
     product being probed.
     """
-    out = await catalog.get_product(transport, GetProductInput(product_id=99999999))
+    out = await catalog.get_product(live_transport, GetProductInput(product_id=99999999))
     assert out.startswith("Error:")
     assert "Unknown error" not in out
 
 
-async def test_categories_return_real_rows(transport):
+async def test_categories_return_real_rows(live_transport):
     """A tool added in this plan, never exercised against the API before."""
-    out = await catalog.list_categories(transport, ListCategoriesInput(limit=5))
+    out = await catalog.list_categories(live_transport, ListCategoriesInput(limit=5))
     assert "Catalog Categories" in out
     assert "ID" in out
 
 
-async def test_the_caller_s_limit_is_respected(transport):
+async def test_the_caller_s_limit_is_respected(live_transport):
     """Proves the catalog tools do not silently walk every page."""
     out = await catalog.list_catalog_products(
-        transport, ListCatalogProductsInput(limit=2, format="json"))
+        live_transport, ListCatalogProductsInput(limit=2, format="json"))
     assert len(json.loads(out)["data"]) == 2
 
 
-async def test_an_estimate_can_be_started_and_read(transport):
+async def test_an_estimate_can_be_started_and_read(live_transport):
     """The create/read split, end to end.
 
     Estimation creates a task and charges nothing. This asserts the task is
@@ -3708,7 +3715,7 @@ async def test_an_estimate_can_be_started_and_read(transport):
     that it completes, because completion timing is the API's business.
     """
     items = [{"source": "catalog", "catalog_variant_id": 4012, "quantity": 1}]
-    started = await orders.create_estimation_task(transport, CreateEstimationTaskInput(
+    started = await orders.create_estimation_task(live_transport, CreateEstimationTaskInput(
         recipient_country_code="US", recipient_state_code="CA",
         recipient_city="San Francisco", recipient_zip="94107",
         items_json=json.dumps(items)))

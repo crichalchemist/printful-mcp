@@ -23,7 +23,7 @@ def calculate_rates(recipient: Dict[str, Any], items: List[Dict[str, Any]],
     normalized = [{**item, "source": item.get("source") or "catalog"}
                   for item in items]
 
-    body: Dict[str, Any] = {"recipient": recipient, "order_items": normalized}
+    body: Dict[str, Any] = {"recipient": dict(recipient), "order_items": normalized}
     if currency:
         body["currency"] = currency
     if locale:

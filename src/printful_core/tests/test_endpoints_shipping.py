@@ -41,6 +41,14 @@ def test_rates_reject_empty_items():
         shipping.calculate_rates(RECIPIENT, [])
 
 
+def test_rates_do_not_alias_caller_recipient():
+    """A caller reusing a recipient dict must not retroactively alter a built request."""
+    recipient = dict(RECIPIENT)
+    req = shipping.calculate_rates(recipient, [{"catalog_variant_id": 1, "quantity": 1}])
+    recipient["zip"] = "99999"
+    assert req.json["recipient"]["zip"] != "99999"
+
+
 def test_tax_uses_v1():
     req = shipping.calculate_tax("US", state_code="CA", zip_code="90001")
     assert req.version == "v1"

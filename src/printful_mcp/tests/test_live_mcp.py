@@ -139,7 +139,7 @@ async def test_product_templates_come_back_under_the_v1_items_key(live_transport
 async def test_a_template_row_carries_the_fields_the_renderer_prints(live_transport):
     """A wrong row key renders 'N/A' forever: valid markdown, no error.
 
-    The renderer prints `title`, `catalog_product_id` and `created_at`. Those
+    The renderer prints `title`, `product_id` and `created_at`. Those
     three names are the last unverified thing in this plan. This skips loudly
     rather than passing when the store has no templates -- a vacuous pass here
     would read as confirmation.
@@ -149,7 +149,7 @@ async def test_a_template_row_carries_the_fields_the_renderer_prints(live_transp
     rows = body if isinstance(body, list) else body.get("items", [])
     if not rows:
         pytest.skip("store has no product templates; row field names unverified")
-    missing = [k for k in ("title", "catalog_product_id", "created_at")
+    missing = [k for k in ("title", "product_id", "created_at")
                if k not in rows[0]]
     assert not missing, (
         f"the renderer prints keys the API does not send: {missing}. "

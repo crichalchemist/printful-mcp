@@ -430,6 +430,21 @@ class TestOrders:
         assert result["data"]["id"] == "t1"
         assert len(t.requests) == 1
 
+    def test_estimate_polls_a_task_delivered_in_a_list(self):
+        """A list-shaped `data` used to abort before polling ever started.
+
+        Printful wraps some task responses in a list. Reading the id off that
+        shape raised AttributeError, so an estimate that would have succeeded
+        never made its second request.
+        """
+        t = FakeTransport([
+            {"data": [{"id": "t1", "status": "pending"}]},
+            {"data": [{"id": "t1", "status": "completed"}]},
+        ])
+        result = orders_mod.estimate_costs(t, {}, [_ITEM], interval=0, max_wait=5)
+        assert result["data"][0]["status"] == "completed"
+        assert len(t.requests) == 2, "the task id must survive the list unwrap"
+
 
 # --------------------------------------------------------------------------
 # Mockups

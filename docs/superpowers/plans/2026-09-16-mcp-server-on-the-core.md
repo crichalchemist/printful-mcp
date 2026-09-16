@@ -3354,10 +3354,24 @@ repository still holds two HTTP stacks and the two surfaces can still drift.
 rtk proxy git grep -n "printful_mcp.client\|from .client\|from ..client\|PrintfulClient\|PrintfulAPIError"
 ```
 
-Expected hits, and only these: `src/printful_mcp/server.py`,
-`src/printful_mcp/client.py` itself, and `tests/test_client_errors.py`. **Any hit
-inside `src/printful_mcp/tools/` means a domain task did not finish** — go back
-and finish it rather than deleting the module out from under it.
+Expected hits, and only these four files:
+
+| File | What the hits are | What to do |
+|---|---|---|
+| `src/printful_mcp/client.py` | the module itself | deleted in Step 2 |
+| `tests/test_client_errors.py` | tests of the deleted module | deleted in Step 3 |
+| `src/printful_mcp/server.py` | the import, `get_client`, `_cleanup_client` | stripped in Step 2 |
+| `src/printful_mcp/tests/test_transport.py` | **one docstring**, no import | see below |
+
+The fourth is not an import and does not break when `client.py` goes. It is a
+docstring in `test_fake_transport_raises_a_queued_exception_instance` reading
+*"to assert a tool's `except PrintfulAPIError` path"* — the name of the class
+this task deletes. Change that one word to `PrintfulError`, which is what the
+tools actually catch and what the test itself constructs two lines below. Do
+not touch anything else in that file.
+
+**Any hit inside `src/printful_mcp/tools/` means a domain task did not finish**
+— go back and finish it rather than deleting the module out from under it.
 
 - [ ] **Step 2: Delete the module and strip the server**
 

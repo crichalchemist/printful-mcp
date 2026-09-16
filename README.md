@@ -400,7 +400,7 @@ Detailed token configuration guide
 </td>
 <td align="center" width="33%">
 
-### 🧪 [Testing Guide](CLAUDE.md#tests)
+### 🧪 [Testing Guide](#testing)
 Learn how to test your integration
 
 </td>

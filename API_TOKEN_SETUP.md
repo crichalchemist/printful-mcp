@@ -242,10 +242,11 @@ For testing only:
 ```bash
 export PRINTFUL_API_KEY=your-actual-token-here
 export PRINTFUL_STORE_ID=your-store-id
-.venv/bin/python -m pytest -m live
+.venv/bin/python -m pytest -m live -k "TestLiveReadOnly"
 ```
 
-**Note:** This only lasts for your current terminal session.
+**Note:** This only lasts for your current terminal session. See "Testing Your Token" below for
+what this command actually runs and what a full live run would do differently.
 
 ---
 
@@ -290,12 +291,25 @@ After setting up your token, test it:
 # Set your token
 export PRINTFUL_API_KEY=your-token-here
 
-# Run the live test suite (an account-level token also needs PRINTFUL_STORE_ID
-# exported, or store-scoped calls are rejected)
-.venv/bin/python -m pytest -m live
+# Run the read-only live checks (an account-level token also needs
+# PRINTFUL_STORE_ID exported, or store-scoped calls are rejected)
+.venv/bin/python -m pytest -m live -k "TestLiveReadOnly"
 ```
 
-If your token and scopes are configured correctly, the suite reports all tests passing.
+`TestLiveReadOnly` (in `src/printful_cli/tests/test_full_e2e.py`) is the one live class that
+touches nothing but `GET` requests — it lists countries, products, variants, categories,
+stores and orders, and checks that a bad product ID errors cleanly. Every assertion in it
+tolerates an empty, brand-new store, so if your token and scopes are configured correctly, it
+reports all 11 tests passing.
+
+**This is deliberately not the full `-m live` run.** `.venv/bin/python -m pytest -m live` (no
+`-k`) also collects everything in `TestLiveDraftOrder` — its own source labels the class
+"Live writes"; it creates and cancels a real draft order and starts real (free) estimation
+tasks — plus `test_live_mcp.py::test_an_estimate_can_be_started_and_read`, which also starts an
+estimation task, and, only when you additionally set `PRINTFUL_E2E_MOCKUPS=1`, mockup and
+file-upload tests. Nothing here charges your account (draft orders aren't confirmed, estimates
+place no order), but they are real writes, not a read-only check. Run the full suite only if you
+want that coverage and understand what it does.
 
 ---
 
@@ -323,7 +337,7 @@ Security:
 - [ ] Enabled all recommended scopes
 - [ ] Added token to `.env` file
 - [ ] Verified `.env` is in `.gitignore`
-- [ ] Tested with `.venv/bin/python -m pytest -m live`
+- [ ] Tested with `.venv/bin/python -m pytest -m live -k "TestLiveReadOnly"`
 - [ ] Configured Cursor/Claude Desktop MCP
 
 ---

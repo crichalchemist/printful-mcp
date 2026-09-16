@@ -159,14 +159,25 @@ These use Printful's public v2 API:
 **Recommendation:** Use "Account" - it's more flexible and you can still specify which store with `PRINTFUL_STORE_ID`.
 
 ### Q: How do I know if my scopes are correct?
-**A:** Run the test suite:
+**A:** Run the read-only live checks:
 ```bash
 export PRINTFUL_API_KEY=your-key
 export PRINTFUL_STORE_ID=your-store-id  # required for an Account-level token
-.venv/bin/python -m pytest -m live
+.venv/bin/python -m pytest -m live -k "TestLiveReadOnly"
 ```
 
-If you get permission errors, you need to add more scopes.
+If you get permission errors, you need to add more scopes. This selector only issues `GET`
+requests — it exercises the orders and store-information scopes above, but not "View and
+manage all store files," since the only live test that touches files sits inside the mockup
+class (`TestLiveMockups`), which is skipped unless you also set `PRINTFUL_E2E_MOCKUPS=1`. A
+clean pass here does not confirm the files scope; a missing one there would first show up as a
+403 from `printful_add_file`.
+
+Running the full `-m live` suite (drop the `-k`) checks more, but it is not a read-only check:
+it also runs everything in `TestLiveDraftOrder` (its own source labels the class "Live
+writes" — it creates and cancels a real draft order and starts real estimation tasks) plus
+`test_live_mcp.py`'s own estimation-task test, and, only with `PRINTFUL_E2E_MOCKUPS=1`, the
+mockup and file-upload tests.
 
 ### Q: Can I change scopes later?
 **A:** Yes! Go to https://www.printful.com/dashboard/api and edit your token's scopes, or create a new token.
@@ -186,7 +197,8 @@ If you get permission errors, you need to add more scopes.
     [ ] View all store products
 [ ] Copy the API key
 [ ] Add to .env file: PRINTFUL_API_KEY=...
-[ ] Test: .venv/bin/python -m pytest -m live
+[ ] Test: .venv/bin/python -m pytest -m live -k "TestLiveReadOnly"
+    (read-only; does not verify the "View and manage all store files" scope above)
 ```
 
 Done! 🎉

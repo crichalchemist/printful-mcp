@@ -1865,6 +1865,13 @@ Append to `src/printful_mcp/tests/test_orders.py`:
 ```python
 async def test_an_update_sends_a_patch_with_only_the_changed_fields(transport):
     """A PUT-shaped update would blank every field the caller omitted."""
+    # Queue a renderable body: update_order renders markdown.order(), which reads
+    # id/status/created_at/updated_at unguarded. The empty-queue default
+    # {"data": {}} would raise KeyError inside the tool's try, and `except
+    # PrintfulError` does not catch it -- the failure would read as a tool bug.
+    transport._responses.append({"data": {"id": 42, "status": "draft",
+                                          "created_at": "2026-01-01",
+                                          "updated_at": "2026-01-01"}})
     await orders.update_order(transport, UpdateOrderInput(
         order_id="42", changes_json='{"recipient":{"address1":"2 New Street"}}'))
     assert transport.last.method == "PATCH"
@@ -3215,6 +3222,10 @@ async def test_file_visibility_reaches_the_request(transport):
 
     Dropping it silently makes every uploaded file visible.
     """
+    # markdown.file_added reads id/status/url unguarded, so the empty-queue
+    # default {"data": {}} would raise KeyError inside the tool's try block.
+    transport._responses.append({"data": {
+        "id": 9, "status": "waiting", "url": "https://example.com/art.png"}})
     await files.add_file(transport, AddFileInput(
         url="https://example.com/art.png", visible=False))
     assert transport.last.json["visible"] is False

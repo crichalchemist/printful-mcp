@@ -204,14 +204,16 @@ PRINTFUL_API_KEY=your-actual-token-here
 
 ### Method 2: Direct in MCP Config
 
+Use an **absolute path** to the interpreter you installed into. A bare `python` resolves against
+`PATH` and picks whichever interpreter the client happens to find first, which is usually not the
+one holding this package.
+
 For Cursor (`~/.cursor/mcp.json`):
 ```json
 {
   "mcpServers": {
     "printful": {
-      "command": "python",
-      "args": ["-m", "printful_mcp"],
-      "cwd": "/path/to/printful-mcp",
+      "command": "/absolute/path/to/printful-mcp/.venv/bin/printful-mcp",
       "env": {
         "PRINTFUL_API_KEY": "your-actual-token-here"
       }
@@ -225,9 +227,7 @@ For Claude Desktop (`~/Library/Application Support/Claude/claude_desktop_config.
 {
   "mcpServers": {
     "printful": {
-      "command": "python",
-      "args": ["-m", "printful_mcp"],
-      "cwd": "/path/to/printful-mcp",
+      "command": "/absolute/path/to/printful-mcp/.venv/bin/printful-mcp",
       "env": {
         "PRINTFUL_API_KEY": "your-actual-token-here"
       }

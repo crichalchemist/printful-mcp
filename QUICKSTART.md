@@ -59,7 +59,7 @@ grep -c '^PRINTFUL_API_KEY=.' .env
 ```
 
 `1` means it is set. Note that `.venv/bin/printful config get` checks a **different** source —
-`~/.config/printful/config.json`, which `printful config set` writes — so it reports
+`~/.config/printful/config.json`, which `.venv/bin/printful config set` writes — so it reports
 `No config set.` even when your `.env` is perfectly correct.
 
 ## 5. Point your client at it

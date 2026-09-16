@@ -132,8 +132,9 @@ common reason a working install does not start under an MCP client:
 
 For Cursor that file is `~/.cursor/mcp.json`; for Claude Desktop it is
 `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS.
-`cursor-mcp-config.json` in this repository is the same shape written out, using module
-invocation and a `cwd`.
+`cursor-mcp-config.json` in this repository is an older sample of the same entry. It uses a bare
+`"command": "python"` with a `cwd` — the exact `PATH` trap described above — so change the
+command to an absolute path before using it.
 
 ### Option 4 — Codex
 
@@ -176,17 +177,24 @@ For local development, copy the example file and fill it in:
 cp .env.example .env
 ```
 
-To confirm a key is in place without printing it, use the CLI — `printful config get` masks the
-token, showing only the last four characters:
+A token can live in two independent places, and **they do not see each other**:
+
+- **`.env` or the environment** — what the MCP server reads.
+- **`~/.config/printful/config.json`** — written by `printful config set api_key <token>`, read
+  by the CLI. `printful config path` prints its location.
+
+Resolution order is explicit argument, then `PRINTFUL_API_KEY`, then that config file. So
+`printful config get` reports `No config set.` when your token is in `.env` — that is the config
+file being empty, not a missing key.
+
+To confirm either one without printing the value:
 
 ```bash
-printful config get
+grep -c '^PRINTFUL_API_KEY=.' .env   # 1 when .env carries it
+printful config get                  # reads the config file; masks all but the last 4 characters
 ```
 
 **Never echo, paste or commit the token.** `.env` is git-ignored; keep it that way.
-
-`printful config set api_key <token>` stores credentials outside the repository. Resolution
-order is explicit argument, then `PRINTFUL_API_KEY`, then the config file.
 
 ---
 
@@ -440,15 +448,17 @@ after 30 seconds.
 <details>
 <summary><b>"PRINTFUL_API_KEY environment variable is required"</b></summary>
 
-The key is not reaching the process. Confirm it without printing it:
+The key is not reaching the process. Check the source you actually used, without printing the
+value:
 
 ```bash
-printful config get
+grep -c '^PRINTFUL_API_KEY=.' .env   # 1 when .env carries it
+printful config get                  # reads the CLI config file, which is not .env
 ```
 
-Under an MCP client the key must be in the `env` block of the server entry — the client does
-not inherit your shell. In JSON it is a bare string with no surrounding quotes inside the
-value.
+Under an MCP client neither file may be involved: the client does not inherit your shell, so
+the key must be in the `env` block of the server entry. In JSON the value is a bare string with
+no extra quotes inside it.
 
 </details>
 

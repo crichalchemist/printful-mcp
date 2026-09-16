@@ -49,8 +49,15 @@ cp .env.example .env
 Put your token in `.env` as `PRINTFUL_API_KEY=...`, plus `PRINTFUL_STORE_ID=...` if your token
 is account-level. `.env` is git-ignored. **Never paste or commit the token.**
 
-`printful config get` confirms a token is in place without printing it — it shows only the last
-four characters.
+To confirm the line is set without printing the value:
+
+```bash
+grep -c '^PRINTFUL_API_KEY=.' .env
+```
+
+`1` means it is set. Note that `printful config get` checks a **different** source —
+`~/.config/printful/config.json`, which `printful config set` writes — so it reports
+`No config set.` even when your `.env` is perfectly correct.
 
 ## 5. Point your client at it
 

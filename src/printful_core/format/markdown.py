@@ -578,12 +578,21 @@ def store_statistics(data: Dict[str, Any], date_from: str, date_to: str) -> str:
     return "\n".join(lines)
 
 
-def store_templates(data: Dict[str, Any]) -> str:
-    """A page of saved product templates."""
-    rows = data.get('data', [])
-    paging = data.get('paging', {})
+def store_templates(data: Any) -> str:
+    """A page of saved product templates.
+
+    v1 only, so this receives the unwrapped `result` rather than a v2
+    data/paging envelope. The CLI normalizes the same endpoint at
+    printful_cli/core/stores.py and finds two shapes: the documented
+    {"items": [...], "paging": {...}} and a bare list. Both render here.
+    """
+    if isinstance(data, list):
+        rows, paging = data, {}
+    else:
+        rows = data.get('items', [])
+        paging = data.get('paging', {})
     lines = [
-        f"# Product Templates ({paging.get('total', 0)} total)",
+        f"# Product Templates ({paging.get('total', len(rows))} total)",
         f"",
         f"Showing {len(rows)} templates",
         f"",

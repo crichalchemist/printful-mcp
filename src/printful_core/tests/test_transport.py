@@ -73,7 +73,7 @@ class TestResponseNormalization:
         assert t.send(Request("GET", "/store/products", version="v1")) == [{"id": 9}]
 
     def test_204_returns_empty_dict(self):
-        t = make_sync([FakeHTTPResponse(204, {}, text="")])
+        t = make_sync([FakeHTTPResponse(204, {"data": "x"}, text="")])
         assert t.send(Request("DELETE", "/orders/1")) == {}
 
     def test_invalid_json_raises(self):

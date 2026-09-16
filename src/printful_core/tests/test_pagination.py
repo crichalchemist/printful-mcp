@@ -199,3 +199,16 @@ async def test_both_drivers_return_an_unpaginated_body_after_one_call():
 
     assert from_sync == from_async == {"data": [{"code": "US"}]}
     assert _calls(sync_send) == _calls(async_send) == [(PAGE_LIMIT, 0)]
+
+
+def test_both_total_checks_agree_on_what_is_not_paginated():
+    """`next_page_request` and `merge_pages` each decide this for themselves.
+
+    One says "stop walking", the other says "hand the body back untouched", and
+    they must mean the same thing by it: if only the first narrows, the walk
+    stops and the body is still rewritten into a merged shape it never earned.
+    """
+    for total in (None, "239", 239.0, [239]):
+        page = {"data": [{"code": "US"}], "paging": {"total": total, "limit": 100}}
+        assert next_page_request(Request("GET", "/countries"), [page]) is None
+        assert merge_pages([page]) is page

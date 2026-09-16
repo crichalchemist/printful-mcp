@@ -60,3 +60,14 @@ def test_single_page_needs_one_request():
     send = make_sender([{"data": [1], "paging": {"total": 1, "limit": 100, "offset": 0}}])
     collect_pages(Request("GET", "/countries"), send)
     assert len(send.sent) == 1
+
+
+def test_server_limit_propagates_to_later_requests():
+    """A server that caps the page size smaller than PAGE_LIMIT keeps that cap."""
+    send = make_sender([
+        {"data": [1, 2], "paging": {"total": 4, "limit": 2, "offset": 0}},
+        {"data": [3, 4], "paging": {"total": 4, "limit": 2, "offset": 2}},
+    ])
+    collect_pages(Request("GET", "/countries"), send)
+    assert send.sent[0].params["limit"] == PAGE_LIMIT   # first page asks for the max
+    assert send.sent[1].params["limit"] == 2            # later pages honor the server's cap

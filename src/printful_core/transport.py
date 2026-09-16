@@ -81,7 +81,16 @@ class SyncTransport:
 
 
 class AsyncTransport:
-    """Executes requests asynchronously. Used by the MCP server."""
+    """Executes requests asynchronously. Used by the MCP server.
+
+    `send` below is deliberately a verbatim copy of SyncTransport.send rather
+    than a call into a shared request-construction helper. The duplicated part
+    is six lines of keyword arguments in the one module that touches the
+    network; a helper would save those six lines and add an indirection between
+    a reader and the httpx call they came here to check. The decisions that
+    actually drift — URL construction and response normalization — are already
+    shared, in `_url` and `_normalize`. This was decided, not overlooked.
+    """
 
     def __init__(self, credentials: Credentials, timeout: float = DEFAULT_TIMEOUT):
         self.credentials = credentials

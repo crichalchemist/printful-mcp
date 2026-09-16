@@ -5,11 +5,10 @@ gated behind --yes in the command layer, not here.
 """
 from __future__ import annotations
 
-import time
 from typing import Any, Dict, List, Optional
 
+from printful_core import polling
 from printful_core.endpoints import orders as endpoints
-from printful_core.errors import PrintfulError
 from printful_core.format import summary
 from printful_core.transport import SyncTransport
 
@@ -61,27 +60,10 @@ def estimate_costs(transport: SyncTransport, recipient: Dict[str, Any],
                    interval: float = 2.0) -> Dict[str, Any]:
     """Create an estimation task and poll until it leaves 'pending'."""
     task = transport.send(endpoints.create_estimation_task(recipient, items))
-    body = task.get("data", task) if isinstance(task, dict) else {}
-    task_id = body.get("id")
+    task_id = polling.task_body(task).get("id")
     if not poll or not task_id:
         return task
 
-    deadline = time.monotonic() + max_wait
-    latest = task
-    while time.monotonic() < deadline:
-        latest = transport.send(endpoints.get_estimation_task(task_id))
-        current = latest.get("data", latest) if isinstance(latest, dict) else {}
-        status = current.get("status")
-        if status == "completed":
-            return latest
-        if status == "failed":
-            reasons = current.get("failure_reasons") or []
-            raise PrintfulError(
-                "Order estimation failed: "
-                + ("; ".join(str(r) for r in reasons) or "no reason given"),
-                detail=current)
-        time.sleep(interval)
-
-    raise PrintfulError(
-        f"Order estimation task {task_id} still pending after {max_wait}s.",
-        detail={"task_id": task_id, "last_response": latest})
+    return polling.poll_estimation_task(
+        endpoints.get_estimation_task(task_id), transport.send,
+        task_id, task, max_wait, interval)

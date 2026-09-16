@@ -8,11 +8,10 @@ of being walked into a lockout.
 """
 from __future__ import annotations
 
-import time
 from typing import Any, Dict, List, Optional
 
+from printful_core import polling
 from printful_core.endpoints import mockups as endpoints
-from printful_core.errors import PrintfulError
 from printful_core.format import summary
 from printful_core.transport import SyncTransport
 
@@ -40,27 +39,9 @@ def wait_for_task(transport: SyncTransport, task_id: str,
                   max_wait: float = 120.0,
                   interval: float = 5.0) -> Dict[str, Any]:
     """Poll a mockup task until it completes or fails."""
-    deadline = time.monotonic() + max_wait
-    latest: Dict[str, Any] = {}
-    while time.monotonic() < deadline:
-        latest = transport.send(endpoints.get_task(task_id))
-        body = latest.get("data", latest)
-        if isinstance(body, list):
-            body = body[0] if body else {}
-        status = body.get("status")
-        if status == "completed":
-            return latest
-        if status == "failed":
-            raise PrintfulError(
-                f"Mockup task {task_id} failed: {body.get('reason', 'no reason given')}",
-                detail=body,
-            )
-        time.sleep(interval)
-    raise PrintfulError(
-        f"Mockup task {task_id} still pending after {max_wait}s. "
-        f"Re-check with: mockup status {task_id}",
-        detail={"task_id": task_id, "last_response": latest},
-    )
+    return polling.poll_mockup_task(
+        endpoints.get_task(task_id), transport.send, task_id,
+        max_wait, interval)
 
 
 def list_styles(transport: SyncTransport, product_id: int) -> Dict[str, Any]:

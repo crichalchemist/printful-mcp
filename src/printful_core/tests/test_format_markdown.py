@@ -345,3 +345,360 @@ def test_a_tax_answer_distinguishes_zero_from_not_required():
     assert "**Tax required:** yes" in enveloped
     assert "0.0825" in enveloped
     assert "**Shipping taxable:** yes" in enveloped
+
+
+def test_a_confirmed_order_reports_the_id_the_caller_must_quote():
+    """printful_confirm_order charges the account, and its output is the
+    caller's receipt. The id is the only handle on that charge -- a renamed
+    key renders 'unknown' and the caller has been billed for an order they
+    cannot look up.
+
+    `calculation_status` lives under `costs`, not at the body's top level --
+    the brief's own worked example places it at the top, and the renderer
+    never reads it from there (verified by running that exact fixture: the
+    'done' branch never fires and the cost lines never print). This fixture
+    nests it correctly so the 'done' branch's five cost lines actually render.
+    """
+    out = markdown.order(
+        {
+            "id": 98765,
+            "status": "pending",
+            "external_id": "ext-1",
+            "created_at": "2026-01-01",
+            "updated_at": "2026-01-02",
+            "recipient": {
+                "name": "A Buyer",
+                "address1": "1 Main St",
+                "city": "SF",
+                "state_code": "CA",
+                "zip": "94107",
+                "country_name": "United States",
+                "country_code": "US",
+            },
+            "costs": {
+                "calculation_status": "done",
+                "currency": "USD",
+                "subtotal": 20.0,
+                "shipping": 5.0,
+                "tax": 1.5,
+                "total": 26.5,
+            },
+            "order_items": [
+                {
+                    "id": 4501,
+                    "name": "Tee",
+                    "catalog_variant_id": 4012,
+                    "quantity": 1,
+                    "price": 20.0,
+                    "currency": "USD",
+                }
+            ],
+        }
+    )
+    assert "# Order 98765" in out
+    assert "**Status:** pending" in out
+    assert "**External ID:** ext-1" in out
+    assert "**Created:** 2026-01-01" in out
+    assert "**Updated:** 2026-01-02" in out
+    assert "**Name:** A Buyer" in out
+    assert "**Address:** 1 Main St" in out
+    assert "**City:** SF, CA 94107" in out
+    assert "**Country:** United States (US)" in out
+    assert "**Currency:** USD" in out
+    assert "**Subtotal:** 20.0" in out
+    assert "**Shipping:** 5.0" in out
+    assert "**Tax:** 1.5" in out
+    assert "**Total:** 26.5" in out
+    assert "## Order Items (1)" in out
+    assert "- **Item 4501**: Tee" in out
+    assert "Variant: 4012" in out
+    assert "Quantity: 1" in out
+    assert "Price: 20.0 USD" in out
+
+
+def test_an_empty_order_body_degrades_without_claiming_a_wrong_id():
+    """A 204 or empty 2xx reaches this renderer as {}. It must not invent an
+    id: 'unknown' is honest, a stale or defaulted number is not -- and it
+    must not render a Recipient/Costs/Order Items section that implies data
+    the response never carried.
+    """
+    out = markdown.order({})
+    assert "# Order unknown" in out
+    assert "**Status:** unknown" in out
+    assert "**External ID:** N/A" in out
+    assert "**Created:** N/A" in out
+    assert "**Updated:** N/A" in out
+    assert "## Recipient" not in out
+    assert "## Costs" not in out
+    assert "## Order Items" not in out
+    assert isinstance(out, str)
+
+
+def test_an_order_with_costs_still_calculating_reports_the_status_not_stale_totals():
+    """Costs are calculated asynchronously. A caller polling mid-calculation
+    must see why totals are missing, not a phantom subtotal borrowed from the
+    'done' branch's defaults -- both branches print a line labelled
+    '**Status:**' under '## Costs', so a rename can silently swap one for
+    the other without either assertion failing on its own.
+    """
+    out = markdown.order(
+        {
+            "id": 222,
+            "status": "draft",
+            "costs": {"calculation_status": "calculating"},
+        }
+    )
+    assert "**Status:** calculating" in out
+    assert "**Status:** draft" in out
+    assert "**Subtotal:**" not in out
+    assert "**Total:**" not in out
+
+
+def test_an_orders_page_reports_the_total_not_just_what_it_shows():
+    """A page of 1 out of 87 must not read as 1 order existing -- the same
+    carry-over accounting bug `products` (this renderer's catalog sibling)
+    had to guard against.
+    """
+    out = markdown.orders(
+        {
+            "data": [
+                {
+                    "id": 555,
+                    "status": "fulfilled",
+                    "external_id": "ext-77",
+                    "created_at": "2026-02-01",
+                    "costs": {"total": 42.5, "currency": "USD"},
+                    "order_items": [{"id": 1}, {"id": 2}],
+                }
+            ],
+            "paging": {"total": 87, "offset": 5, "limit": 50},
+        }
+    )
+    assert "87 total" in out
+    assert "Showing 1 orders" in out
+    assert "offset: 5" in out
+    assert "limit: 50" in out
+    assert "## Order 555" in out
+    assert "**Status:** fulfilled" in out
+    assert "**External ID:** ext-77" in out
+    assert "**Total:** 42.5 USD" in out
+    assert "**Items:** 2" in out
+    assert "**Created:** 2026-02-01" in out
+
+
+def test_order_items_page_names_the_order_it_belongs_to():
+    """`printful_list_order_items` doesn't repeat the order id on each row --
+    the caller supplies it for the heading -- so a wrong row key silently
+    drops the one thing that tells someone what they are about to ship.
+    """
+    out = markdown.order_items(
+        {
+            "data": [
+                {
+                    "id": 9001,
+                    "name": "Hoodie",
+                    "catalog_variant_id": 4013,
+                    "quantity": 3,
+                    "price": 35.0,
+                    "currency": "EUR",
+                }
+            ]
+        },
+        order_id="ORD-1",
+    )
+    assert "# Items on Order ORD-1 (1)" in out
+    assert "## Item 9001" in out
+    assert "**Name:** Hoodie" in out
+    assert "**Variant:** 4013" in out
+    assert "**Quantity:** 3" in out
+    assert "**Price:** 35.0 EUR" in out
+
+
+def test_a_shipment_row_carries_the_tracking_a_buyer_follows():
+    """A shipped order with no tracking number or URL leaves a buyer unable
+    to find their package; this renderer is the only place those two values
+    surface together with the carrier and service that sent them.
+    """
+    out = markdown.shipments(
+        {
+            "data": [
+                {
+                    "id": 701,
+                    "carrier": "USPS",
+                    "service": "Priority",
+                    "tracking_number": "9400abc123",
+                    "tracking_url": "https://track.example/9400abc123",
+                    "shipped_at": "2026-03-01",
+                }
+            ]
+        },
+        order_id="ORD-2",
+    )
+    assert "# Shipments for Order ORD-2 (1)" in out
+    assert "## Shipment 701" in out
+    assert "**Carrier:** USPS" in out
+    assert "**Service:** Priority" in out
+    assert "**Tracking number:** 9400abc123" in out
+    assert "**Tracking URL:** https://track.example/9400abc123" in out
+    assert "**Shipped at:** 2026-03-01" in out
+
+
+def test_an_order_with_no_shipments_yet_says_so_instead_of_an_empty_list():
+    """Before fulfillment, `data` is genuinely empty -- a bare '(0)' heading
+    would read as a bug or a lost shipment rather than 'not shipped yet'.
+    """
+    out = markdown.shipments({"data": []}, order_id="ORD-3")
+    assert "No shipments yet. Shipments appear once the order is fulfilled." in out
+    assert "# Shipments for Order ORD-3" in out
+
+
+def test_a_pending_estimate_tells_the_caller_to_poll_again():
+    """A pending estimate has no costs yet -- printing N/A costs instead of
+    saying 'still calculating' would read as a $0 order.
+    """
+    out = markdown.estimate({}, status="pending")
+    assert "still being calculated" in out
+    assert "printful_get_estimation_task" in out
+    assert "**Status:** pending" in out
+
+
+def test_a_failed_estimate_lists_the_reasons_not_just_that_it_failed():
+    """A caller cannot fix an estimate that failed for an unstated reason --
+    the reason strings are the only actionable content in this branch, and
+    an empty list must still say something rather than nothing.
+    """
+    out = markdown.estimate(
+        {"failure_reasons": ["Unsupported destination", "Missing weight"]},
+        status="failed",
+    )
+    assert "- Unsupported destination" in out
+    assert "- Missing weight" in out
+    assert "**Status:** failed" in out
+
+    no_reasons = markdown.estimate({"failure_reasons": []}, status="failed")
+    assert "- No reason given." in no_reasons
+
+
+def test_a_completed_estimate_reports_every_cost_line_in_its_currency():
+    """The four cost lines only mean something tied to a currency -- a
+    caller comparing this estimate against a live order needs all five
+    numbers together to catch a shipping-fee surprise before confirming.
+    """
+    out = markdown.estimate(
+        {
+            "costs": {
+                "currency": "GBP",
+                "subtotal": 18.0,
+                "shipping": 4.25,
+                "tax": 0.9,
+                "total": 23.15,
+            }
+        },
+        status="completed",
+    )
+    assert "**Total:** 23.15" in out
+    assert "**Status:** completed" in out
+    assert "**Currency:** GBP" in out
+    assert "**Subtotal:** 18.0" in out
+    assert "**Shipping:** 4.25" in out
+    assert "**Tax:** 0.9" in out
+
+
+def test_a_completed_mockup_task_hands_back_the_url_per_variant_and_placement():
+    """Every mockup is scoped to one catalog variant and one placement --
+    collapsing either key merges unrelated mockup URLs under the wrong
+    variant heading, which is which image belongs to which SKU.
+    """
+    out = markdown.mockup_task(
+        {
+            "id": "task-1",
+            "status": "completed",
+            "catalog_variant_mockups": [
+                {
+                    "catalog_variant_id": 4012,
+                    "mockups": [
+                        {
+                            "placement": "front",
+                            "style_id": 7,
+                            "mockup_url": "https://mockups.example/front.png",
+                            "display_name": "Front view",
+                        }
+                    ],
+                }
+            ],
+        }
+    )
+    assert "https://mockups.example/front.png" in out
+    assert "# Mockup Task task-1" in out
+    assert "## Generated Mockups (1 variants)" in out
+    assert "### Variant 4012" in out
+    assert "**Front view** (front)" in out
+    assert "Style ID: 7" in out
+    assert "**Status:** completed" in out
+
+
+def test_a_pending_mockup_task_tells_the_caller_to_check_back():
+    """A caller polling `printful_get_mockup_task` too early must see
+    'in progress', not a blank mockup list that reads as zero mockups ever
+    coming.
+    """
+    out = markdown.mockup_task({"id": "task-2", "status": "pending"})
+    assert "in progress" in out
+    assert "**Status:** pending" in out
+
+
+def test_a_failed_mockup_task_lists_why_not_just_that_it_failed():
+    """A caller cannot retry sensibly without the reason -- 'failed' alone
+    hides whether it was a bad file url or an unsupported placement.
+    """
+    out = markdown.mockup_task(
+        {
+            "id": "task-3",
+            "status": "failed",
+            "failure_reasons": [{"detail": "File could not be downloaded"}],
+        }
+    )
+    assert "File could not be downloaded" in out
+    assert "**Status:** failed" in out
+
+
+def test_a_mockup_style_row_carries_the_id_a_caller_requests_by():
+    """`printful_create_mockup_task` takes style ids from this list --
+    losing `id` here means a caller can name a style but not order it.
+    """
+    out = markdown.mockup_styles(
+        {"data": [{"id": 101, "name": "Lifestyle", "placement": "front", "technique": "dtg"}]},
+        product_id=71,
+    )
+    assert "# Mockup Styles for Product 71 (1)" in out
+    assert "## Lifestyle — ID 101" in out
+    assert "**Placement:** front" in out
+    assert "**Technique:** dtg" in out
+
+
+def test_a_mockup_template_row_carries_the_print_area_a_design_must_fit():
+    """A design that exceeds `print_area_width`/`height` gets rejected or
+    cropped at generation time -- this is the only place those two numbers
+    surface before a caller submits a mockup task.
+    """
+    out = markdown.mockup_templates(
+        {
+            "data": [
+                {
+                    "id": 55,
+                    "placement": "back",
+                    "technique": "embroidery",
+                    "print_area_width": 12,
+                    "print_area_height": 16,
+                    "image_url": "https://mockups.example/template-55.png",
+                }
+            ]
+        },
+        product_id=71,
+    )
+    assert "# Mockup Templates for Product 71 (1)" in out
+    assert "## Template 55" in out
+    assert "**Placement:** back" in out
+    assert "**Technique:** embroidery" in out
+    assert "**Print area:** 12x16" in out
+    assert "https://mockups.example/template-55.png" in out

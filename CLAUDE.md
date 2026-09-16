@@ -5,13 +5,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-pip install -e ".[dev]"       # install with pytest + ruff
-python -m printful_mcp        # MCP server, stdio transport (default)
-python -m printful_mcp --transport http --port 8000   # streamable-http on /mcp
-printful-mcp                  # same server, via the installed console script
-printful --help               # the CLI surface (src/printful_cli/)
-npx @modelcontextprotocol/inspector python -m printful_mcp   # interactive tool UI
+.venv/bin/pip install -e ".[dev]"  # install with pytest + ruff
+.venv/bin/python -m printful_mcp   # MCP server, stdio transport (default)
+.venv/bin/python -m printful_mcp --transport http --port 8000   # streamable-http on /mcp
+.venv/bin/printful-mcp             # same server, via the installed console script
+.venv/bin/printful --help          # the CLI surface (src/printful_cli/)
+npx @modelcontextprotocol/inspector .venv/bin/python -m printful_mcp   # interactive tool UI
 ```
+
+**Every command above spells out `.venv/bin/`,** for the same reason the test commands below
+do: the install puts nothing on your `PATH`, and `source .venv/bin/activate` does not persist
+between an agent's tool calls. A bare `python` under an MCP client is the single most common
+reason a working install does not start.
 
 `PRINTFUL_API_KEY` must be set (via `.env` or environment) or `__main__.main()` exits 1
 before the server starts.
@@ -93,7 +98,7 @@ may rewrite.
 and `pre-commit` is not in the `[dev]` extra, so a fresh clone has no hook until you add one:
 
 ```bash
-pip install pre-commit && pre-commit install
+.venv/bin/pip install pre-commit && .venv/bin/pre-commit install
 ```
 
 ## Architecture

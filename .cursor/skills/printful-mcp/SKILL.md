@@ -459,7 +459,7 @@ mcporter call printful_mcp.printful_get_product product_id:71
 3. **Use HTTP transport** (bypasses mcporter's stdio bridge):
 ```bash
 # Start server with HTTP transport
-python -m printful_mcp --transport http --port 8000
+.venv/bin/python -m printful_mcp --transport http --port 8000
 
 # Server runs on http://localhost:8000/mcp (StreamableHTTP)
 # Connect HTTP-compatible MCP clients directly

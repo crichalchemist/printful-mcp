@@ -29,15 +29,26 @@ generate a new one.
 ## Installation
 
 ```bash
-cd agent-harness
-pip install -e .
+git clone https://github.com/crichalchemist/printful-mcp.git
+cd printful-mcp
+python -m venv .venv
+.venv/bin/pip install -e ".[dev]"
 ```
 
-Verify it landed on PATH:
+That installs two console scripts into `.venv/bin/`: `printful-mcp` and `printful`.
+This README uses `printful`.
+
+**Every runnable command in this README spells out `.venv/bin/`**, because that is what
+works immediately after the block above — the install does not put anything on your
+`PATH`. If you prefer, `source .venv/bin/activate` once and drop the prefix everywhere;
+the two forms are equivalent, and this document picks the explicit one so nothing depends
+on shell state. (Where a subcommand is named in passing, such as `store use`, it is a name
+rather than something to paste.)
+
+Verify it:
 
 ```bash
-which printful
-printful --version
+.venv/bin/printful --version
 ```
 
 ## Configuration
@@ -50,10 +61,10 @@ config file.
 export PRINTFUL_API_KEY=your-token
 
 # Option 2: stored config (written 0600 to ~/.config/printful/config.json)
-printful config set api_key your-token
+.venv/bin/printful config set api_key your-token
 
 # Account-level tokens only: set the store context (sends X-PF-Store-Id)
-printful config set store_id 12345
+.venv/bin/printful config set store_id 12345
 ```
 
 Store-level tokens already carry their store context and need no store ID.
@@ -63,7 +74,7 @@ estimates will work — otherwise every one returns `This endpoint requires stor
 Pick one interactively:
 
 ```bash
-printful store use
+.venv/bin/printful store use
 #   #  ID        Name                    Type
 #   1  12345678  Example Store           native
 #   2  23456789  Example Store 2         storenvy
@@ -71,7 +82,7 @@ printful store use
 # Select a store [1-3]:
 
 # Or set it directly and make it the default
-printful store use 23456789 --save
+.venv/bin/printful store use 23456789 --save
 ```
 
 With `--json`, or when stdin is not a terminal, the picker does not prompt — it
@@ -80,7 +91,7 @@ returns the store list and an instruction, so scripts and agents never hang.
 Check it works:
 
 ```bash
-printful test
+.venv/bin/printful test
 ```
 
 ## Usage
@@ -88,48 +99,48 @@ printful test
 Running with no subcommand opens the REPL:
 
 ```bash
-printful
+.venv/bin/printful
 ```
 
 One-shot commands:
 
 ```bash
 # Browse
-printful catalog products --limit 5
-printful catalog product 71
-printful catalog variants 71 --limit 5
-printful catalog variant-price 4012
-printful catalog size-guide 71 --unit inches
+.venv/bin/printful catalog products --limit 5
+.venv/bin/printful catalog product 71
+.venv/bin/printful catalog variants 71 --limit 5
+.venv/bin/printful catalog variant-price 4012
+.venv/bin/printful catalog size-guide 71 --unit inches
 
 # Build an order step by step (artwork is required to place the order)
-printful draft recipient --name "Jane Doe" --address1 "1 Main St" \
+.venv/bin/printful draft recipient --name "Jane Doe" --address1 "1 Main St" \
     --city Austin --state-code TX --country-code US --zip 78701
-printful draft add-item --variant-id 4012 --quantity 2 \
+.venv/bin/printful draft add-item --variant-id 4012 --quantity 2 \
     --image-url https://example.com/art.png
-printful draft show
+.venv/bin/printful draft show
 
 # Price it before committing to anything
-printful ship rates
-printful orders estimate
+.venv/bin/printful ship rates
+.venv/bin/printful orders estimate
 
 # Create a DRAFT order (not charged)
-printful draft submit
+.venv/bin/printful draft submit
 
 # Confirm it — THIS CHARGES YOUR ACCOUNT
-printful orders confirm 12345678 --yes
+.venv/bin/printful orders confirm 12345678 --yes
 ```
 
 Every command supports `--json`:
 
 ```bash
-printful --json catalog products --limit 3 | jq '.products[].id'
+.venv/bin/printful --json catalog products --limit 3 | jq '.products[].id'
 ```
 
 `--dry-run` suppresses session writes and, for mutating commands, prints the request
 that would have been sent instead of sending it:
 
 ```bash
-printful --dry-run orders confirm 12345678 --yes
+.venv/bin/printful --dry-run orders confirm 12345678 --yes
 ```
 
 ## Command groups
@@ -168,10 +179,10 @@ printful --dry-run orders confirm 12345678 --yes
   `complete` separately:
 
   ```bash
-  printful draft add-item --variant-id 4012 --quantity 2
+  .venv/bin/printful draft add-item --variant-id 4012 --quantity 2
   # priceable: true, complete: false, items_without_design: 1
 
-  printful draft add-item --variant-id 4012 --quantity 2 \
+  .venv/bin/printful draft add-item --variant-id 4012 --quantity 2 \
       --image-url https://example.com/art.png
   # priceable: true, complete: true
   ```
@@ -198,24 +209,31 @@ One-shot mutations auto-save; `--dry-run` suppresses that. Writes use an exclusi
 file lock.
 
 ```bash
-printful session status
-printful session history --limit 5
-printful session clear
+.venv/bin/printful session status
+.venv/bin/printful session history --limit 5
+.venv/bin/printful session clear
 ```
 
 ## Running the tests
 
 ```bash
-cd agent-harness
-pip install -e ".[dev]"
+.venv/bin/pip install -e ".[dev]"
 
 # Unit tests — no API key, no network
-python -m pytest src/printful_cli/tests/test_core.py -v
+.venv/bin/python -m pytest src/printful_cli/tests/test_core.py -v
 
-# Full suite including live API calls (needs PRINTFUL_API_KEY)
+# This CLI's tests including live API calls
 export PRINTFUL_API_KEY=your-token
-PRINTFUL_FORCE_INSTALLED=1 python -m pytest src/printful_cli/tests/ -v -s
+export PRINTFUL_STORE_ID=23456789        # required for an account-level token
+PRINTFUL_FORCE_INSTALLED=1 .venv/bin/python -m pytest src/printful_cli/tests/ -v -s
 ```
+
+Use `.venv/bin/python -m pytest`, never a bare `pytest` — a bare invocation resolves to
+whichever interpreter is first on `PATH` rather than this project's venv, and the failures
+that follow look like broken guards rather than a wrong interpreter. The last line passes a
+directory, so it collects this package's tests only; it does not stand in for the whole
+repository's suite, which is `.venv/bin/python -m pytest` with no path. See the repository
+root `CLAUDE.md` for both rules in full.
 
 The live E2E tests deliberately never confirm or cancel a real order. See
 `tests/TEST.md` for the full plan, the reasoning, and the recorded coverage gaps.

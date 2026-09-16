@@ -6,6 +6,7 @@ from printful_mcp.models.inputs import (
     CancelOrderInput,
     ConfirmOrderInput,
     CreateOrderInput,
+    ListOrderItemsInput,
     ListOrderShipmentsInput,
     ListOrdersInput,
     UpdateOrderInput,
@@ -145,3 +146,19 @@ async def test_an_unshipped_order_says_so_rather_than_showing_an_empty_heading(t
     out = await orders.list_order_shipments(
         transport, ListOrderShipmentsInput(order_id="42"))
     assert "No shipments yet" in out
+
+
+async def test_order_items_show_the_variant_and_quantity_needed_to_reorder(transport):
+    """`markdown.order_items` reads every field through `.get()`, so a wrong or
+    dropped key would not KeyError -- it would silently render 'N/A' and pass.
+    Without this test, someone restocking or debugging a mis-shipped order could
+    be shown the wrong variant or quantity and never know the renderer was broken.
+    """
+    transport._responses.append({"data": [{"id": 99, "name": "Bella Canvas Tee",
+                                           "catalog_variant_id": 4012, "quantity": 3,
+                                           "price": "12.00", "currency": "USD"}]})
+    out = await orders.list_order_items(transport, ListOrderItemsInput(order_id="42"))
+    assert transport.last.method == "GET"
+    assert transport.last.path == "/orders/42/order-items"
+    assert "**Variant:** 4012" in out
+    assert "**Quantity:** 3" in out

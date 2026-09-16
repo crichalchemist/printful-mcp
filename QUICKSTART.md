@@ -1,42 +1,71 @@
-# Quick Start Guide
+# Quick Start
 
-## Setup in 3 Steps
+One path, start to finish. For the other install options — Claude Code plugin, `uvx` with no
+clone, Codex — see [README.md](README.md#install).
 
-### 1. Get Your Printful API Key
+## 1. Get an API token
 
-1. Go to https://www.printful.com/dashboard/api
-2. Create a new API token with these **recommended scopes**:
-   - ✅ **View and manage all orders** (required)
-   - ✅ **View all store information** (required)
-   - ✅ **View and manage all store files** (required)
-   - ✅ **View all store products** (recommended)
-3. Copy your API key
+1. Go to <https://www.printful.com/dashboard/api> and create a token.
+2. Give it these scopes:
+   - **View and manage all orders** (required)
+   - **View all store information** (required)
+   - **View and manage all store files** (required)
+   - **View all store products** (recommended)
+3. Choose access level **Account (all stores)** for the most flexibility. An account-level token
+   needs `PRINTFUL_STORE_ID` set as well — store-scoped calls are rejected without it.
 
-**Access Level:** Choose "Account (all stores)" for maximum flexibility.
+Full detail, including security notes: [API_TOKEN_SETUP.md](API_TOKEN_SETUP.md).
 
-📖 **Detailed guide:** See [API_TOKEN_SETUP.md](API_TOKEN_SETUP.md) for complete instructions and security tips.
-
-### 2. Install the MCP Server
+## 2. Install
 
 ```bash
-git clone https://github.com/Purple-Horizons/printful-mcp.git
+git clone https://github.com/crichalchemist/printful-mcp.git
 cd printful-mcp
-pip install -e .
+python -m venv .venv
+.venv/bin/pip install -e ".[dev]"
 ```
 
-### 3. Configure Cursor
+This installs two console scripts into `.venv/bin/`: `printful-mcp` (the MCP server) and
+`printful` (the CLI).
 
-Add this to your Cursor MCP settings file:
+## 3. Verify, before wiring anything up
 
-**Location:** `~/.cursor/mcp.json` or workspace `.cursor/mcp.json`
+```bash
+.venv/bin/printful --version
+.venv/bin/python -m printful_mcp --help
+.venv/bin/python -m pytest
+```
+
+The last command runs the offline suite. It needs no network and no credentials; if it passes,
+the install is sound. Use `.venv/bin/python -m pytest`, not a bare `pytest` — a bare invocation
+runs whichever interpreter is first on `PATH`, which is usually not this one.
+
+## 4. Give it your token
+
+```bash
+cp .env.example .env
+```
+
+Put your token in `.env` as `PRINTFUL_API_KEY=...`, plus `PRINTFUL_STORE_ID=...` if your token
+is account-level. `.env` is git-ignored. **Never paste or commit the token.**
+
+`printful config get` confirms a token is in place without printing it — it shows only the last
+four characters.
+
+## 5. Point your client at it
+
+Use an **absolute path** to the interpreter you just installed into. A bare `python` resolves
+against `PATH` and is the most common reason a working install does not start under an MCP
+client.
+
+**Cursor** — `~/.cursor/mcp.json`, or a workspace `.cursor/mcp.json`.
+**Claude Desktop** — `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS.
 
 ```json
 {
   "mcpServers": {
     "printful": {
-      "command": "python",
-      "args": ["-m", "printful_mcp"],
-      "cwd": "/absolute/path/to/printful-mcp",
+      "command": "/absolute/path/to/printful-mcp/.venv/bin/printful-mcp",
       "env": {
         "PRINTFUL_API_KEY": "paste-your-api-key-here"
       }
@@ -45,71 +74,47 @@ Add this to your Cursor MCP settings file:
 }
 ```
 
-**That's it!** Restart Cursor and you'll have access to all Printful tools.
+Restart the client.
 
-## First Commands to Try
+## 6. Try it
 
-Once configured, try these in Cursor:
+In the client:
 
-1. **Browse products:**
-   - "Show me available t-shirts in the catalog"
-   - Uses `printful_list_catalog_products`
+- "Show me available t-shirts in the catalog" → `printful_list_catalog_products`
+- "Get details for product 71" → `printful_get_product`
+- "What's the price for variant 4011?" → `printful_get_variant_prices`
+- "What countries does Printful ship to?" → `printful_list_countries`
 
-2. **Get product details:**
-   - "Get details for product ID 71"
-   - Uses `printful_get_product`
+Or in the terminal, against the same core:
 
-3. **Check pricing:**
-   - "What's the price for variant 4011?"
-   - Uses `printful_get_variant_prices`
-
-4. **List stores:**
-   - "Show my Printful stores"
-   - Uses `printful_list_stores`
-
-## Common Workflows
-
-### Workflow 1: Create an Order
-
-```
-1. Browse catalog → Find product ID
-2. Get variants → Find variant ID (size/color)
-3. Create order → Gets order ID
-4. Add items to order (via create with items)
-5. Confirm order → Starts fulfillment
+```bash
+printful ship countries
+printful catalog products --help
 ```
 
-### Workflow 2: Generate Mockups
+## What runs on which API version
 
-```
-1. Get product → Find mockup style IDs
-2. Upload design → Get file URL
-3. Create mockup task → Get task ID
-4. Check task status → Get mockup URLs
-```
+**v2** — catalog, orders, shipping, mockups, files, store statistics.
+**v1** — sync products, store/product templates, tax rates. These are the endpoints v2 has no
+equivalent for; each builder declares its own version, and nothing switches at runtime.
 
-## Troubleshooting
+There are no webhook tools.
 
-**Server not showing in Cursor:**
-- Restart Cursor completely
-- Check that API key is set in config
-- Verify Python path with `which python`
+## If something is wrong
 
-**"PRINTFUL_API_KEY required" error:**
-- Ensure API key is in the `env` section of MCP config
-- API key should NOT have quotes in the JSON config
+**The server does not appear in the client.** Restart it completely. Check that `command` is an
+absolute path — verify with `ls -l /absolute/path/to/printful-mcp/.venv/bin/printful-mcp`.
 
-**Rate limit errors:**
-- v2 API allows 120 requests/minute
-- Wait time shown in error message
-- Implement request batching if needed
+**"PRINTFUL_API_KEY environment variable is required".** The client does not inherit your
+shell; the key must be in the `env` block of the server entry. In JSON the value is a bare
+string — no extra quotes inside it.
 
-## What's Using v1 vs v2?
+**"This endpoint requires 'store_id'!".** Your token is account-level. Set
+`PRINTFUL_STORE_ID` too.
 
-**v2 (Primary):**
-- ✅ Catalog, Orders, Shipping, Mockups, Files, Stores, Webhooks
+**"Rate limit exceeded".** Wait — do not retry in a loop. The server raises on the first 429
+and deliberately does not retry, because a silent retry against the mockup endpoint is what
+causes Printful's 60-second lockout. New stores are limited to 2 mockup requests per 60
+seconds.
 
-**v1 (Fallback):**
-- ⚠️ Sync Products only (not yet in v2)
-
-The server automatically uses the right version for each feature.
+More, including the tool list and the testing traps: [README.md](README.md).

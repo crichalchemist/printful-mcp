@@ -1,253 +1,392 @@
 <div align="center">
 
-# 🎨 Printful MCP Server
+# Printful MCP Server
 
-### **Automate Your Print-on-Demand Business with AI**
+### Automate your print-on-demand business with AI
 
-Connect Printful's powerful API to Claude, Cursor, and other AI assistants through the Model Context Protocol.
+Connect Printful's API to Claude, Cursor, Codex and other MCP clients — and to your terminal.
 
-[**📚 Quick Start**](#installation) • [**🔧 Configuration**](#configuration) • [**🚀 Examples**](#usage-examples) • [**📖 Documentation**](QUICKSTART.md)
+[**Install**](#install) • [**Configure**](#configuration) • [**Tools**](#the-32-mcp-tools) • [**CLI**](#the-cli) • [**Quick start**](QUICKSTART.md)
 
 ---
 
 [![Made by Purple Horizons](https://img.shields.io/badge/Made_by-Purple_Horizons-7C3AED?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTIgMkw2IDhMMTIgMTRMMTggOEwxMiAyWiIgZmlsbD0id2hpdGUiLz48cGF0aCBkPSJNMTIgMTBMMTggMTZMMTIgMjJMNiAxNkwxMiAxMFoiIGZpbGw9IndoaXRlIi8+PC9zdmc+)](https://purplehorizons.io)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/downloads/)
 [![Printful API v2](https://img.shields.io/badge/Printful-API_v2-00A3FF?style=for-the-badge)](https://developers.printful.com/docs/v2-beta/)
 
-[![GitHub Stars](https://img.shields.io/github/stars/Purple-Horizons/printful-ph-mcp?style=social)](https://github.com/Purple-Horizons/printful-ph-mcp)
-[![GitHub Forks](https://img.shields.io/github/forks/Purple-Horizons/printful-ph-mcp?style=social)](https://github.com/Purple-Horizons/printful-ph-mcp/fork)
-
 ---
 
-### 🎁 **New to Printful?**
+### New to Printful?
 
 <a href="https://www.printful.com/a/purplehorizons">
   <img src="https://img.shields.io/badge/Sign_Up-Get_Started_Free-FA4616?style=for-the-badge&logo=printful&logoColor=white" alt="Sign up for Printful">
 </a>
 
-<sub>Start your print-on-demand business today • No upfront costs • 300+ products • Global fulfillment</sub>
+<sub>No upfront costs • Global fulfillment • Uses Purple Horizons' referral link</sub>
 
 ---
 
 </div>
 
-## ✨ Features
+## About this fork
 
-<table>
-<tr>
-<td width="50%">
+This is a fork of [**Purple-Horizons/printful-mcp**](https://github.com/Purple-Horizons/printful-mcp)
+by [Purple Horizons](https://purplehorizons.io) / [Gianni D'Alerta](https://giannidalerta.com),
+kept under the same [MIT License](LICENSE). The original is the reason this exists and the
+attribution above is deliberate.
 
-### 🎯 **Complete API Coverage**
-- ✅ Full Printful API v2 support
-- ✅ Smart v1 fallback for legacy features
-- ✅ 17 tools across all major domains
-- ✅ Real-time stock & pricing data
+What this fork changes:
 
-</td>
-<td width="50%">
+- **One shared core.** The MCP server and the CLI were two codebases with two HTTP clients, two
+  error parsers and two paginators. They now sit on `src/printful_core/`, so a fix lands once.
+- **A CLI.** `printful` is a second surface over the same core — see [The CLI](#the-cli).
+- **More tools, and a test that counts them.** See [below](#the-32-mcp-tools).
+- **Documentation checked against the code.** Every command in this file was run before it was
+  written down.
 
-### 🛡️ **Production Ready**
-- ✅ Type-safe Pydantic validation
-- ✅ Robust error handling
-- ✅ Rate limit management
-- ✅ Dual output formats (JSON/Markdown)
-
-</td>
-</tr>
-<tr>
-<td width="50%">
-
-### 🚀 **Easy Integration**
-- ✅ Works with Claude Desktop
-- ✅ Works with Cursor IDE
-- ✅ stdio + HTTP transports
-- ✅ No hosting required
-
-</td>
-<td width="50%">
-
-### 🤖 **AI Skill Included**
-- ✅ Cursor skill teaches AI how to use tools
-- ✅ Best practices built-in
-- ✅ Auto-applies workflows
-- ✅ Better experience out of the box
-
-</td>
-</tr>
-</table>
-
-> **🎁 Bonus:** This repo includes a [Cursor AI skill](.cursor/skills/) that automatically teaches AI assistants how to use the Printful MCP effectively. Just open the project and start asking questions!
+Install instructions below point at this fork, because that is where this code lives. Changes
+worth having are offered upstream.
 
 ---
 
-## 🚀 Quick Start
+## Install
 
-<details open>
-<summary><b>📋 Prerequisites</b></summary>
+### Prerequisites
 
-<br>
+- **Python 3.10+** ([download](https://www.python.org/downloads/))
+- **A Printful API token** ([get one](https://www.printful.com/dashboard/api)) — see
+  [API_TOKEN_SETUP.md](API_TOKEN_SETUP.md) for scopes
 
-- **Python 3.10+** ([Download](https://www.python.org/downloads/))
-- **Printful API Key** ([Get one free](https://www.printful.com/dashboard/api))
+### Option 1 — Claude Code plugin
 
-</details>
+This repository is both a plugin and the marketplace that serves it
+(`.claude-plugin/marketplace.json`, `.claude-plugin/plugin.json`). Inside Claude Code:
 
-<details>
-<summary><b>⚡ Installation (3 steps)</b></summary>
-
-<br>
-
-**Step 1: Clone & Install**
-```bash
-git clone https://github.com/Purple-Horizons/printful-ph-mcp.git
-cd printful-ph-mcp
-pip install -e .
+```text
+/plugin marketplace add crichalchemist/printful-mcp
+/plugin install printful-mcp@printful-mcp
 ```
 
-**Step 2: Set up API Key**
+The plugin brings the MCP server (via `.mcp.json`) and two skills — one for the MCP tools, one
+for the CLI.
+
+### Option 2 — `.mcp.json`, no clone
+
+`.mcp.json` in this repository runs the server straight from git with `uvx`; copy it into your
+own project, or use it as the shape of an entry in your client's config:
+
+```json
+{
+  "mcpServers": {
+    "printful": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/crichalchemist/printful-mcp@dev",
+        "printful-mcp"
+      ],
+      "env": {
+        "PRINTFUL_API_KEY": "${PRINTFUL_API_KEY}"
+      }
+    }
+  }
+}
+```
+
+**Two things to know about that ref, both true today:**
+
+- It pins `@dev`, a **moving branch**, not a release tag — you get whatever is on `origin/dev`
+  at the moment `uvx` resolves it, which is not necessarily what you see in this working tree.
+  It becomes `@main` once the open pull request merges.
+- `${PRINTFUL_API_KEY}` is **Claude Code's** expansion syntax. Codex does not expand it — use
+  the Codex section below instead.
+
+### Option 3 — clone and install
+
+The path with no resolver between you and the code:
+
+```bash
+git clone https://github.com/crichalchemist/printful-mcp.git
+cd printful-mcp
+python -m venv .venv
+.venv/bin/pip install -e ".[dev]"
+```
+
+That installs two console scripts, `printful-mcp` and `printful`. Point your client at the
+interpreter that has them — a bare `python` resolves against `PATH` and is the single most
+common reason a working install does not start under an MCP client:
+
+```json
+{
+  "mcpServers": {
+    "printful": {
+      "command": "/absolute/path/to/printful-mcp/.venv/bin/printful-mcp",
+      "env": {
+        "PRINTFUL_API_KEY": "your-api-key-here"
+      }
+    }
+  }
+}
+```
+
+For Cursor that file is `~/.cursor/mcp.json`; for Claude Desktop it is
+`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS.
+`cursor-mcp-config.json` in this repository is the same shape written out, using module
+invocation and a `cwd`.
+
+### Option 4 — Codex
+
+Codex has no `${VAR}` expansion, so name the variables instead of interpolating them. In
+`~/.codex/config.toml`:
+
+```toml
+[mcp_servers.printful]
+command = "uvx"
+args = ["--from", "git+https://github.com/crichalchemist/printful-mcp@dev", "printful-mcp"]
+env_vars = ["PRINTFUL_API_KEY", "PRINTFUL_STORE_ID"]
+```
+
+`env_vars` forwards variables already exported in your shell. The full Codex story, including
+the `.codex-plugin/` manifest and why the compatibility layout was chosen, is in
+[.codex-plugin/INSTALL.md](.codex-plugin/INSTALL.md).
+
+---
+
+## Configuration
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `PRINTFUL_API_KEY` | yes | Your Printful API token |
+| `PRINTFUL_STORE_ID` | only for account-level tokens | Sent as `X-PF-Store-Id` on every request |
+
+Without `PRINTFUL_API_KEY` the server refuses to start rather than failing later:
+
+```console
+$ python -m printful_mcp
+Error: PRINTFUL_API_KEY environment variable is required
+Get your API key from: https://www.printful.com/dashboard/api
+$ echo $?
+1
+```
+
+For local development, copy the example file and fill it in:
+
 ```bash
 cp .env.example .env
-# Edit .env and add: PRINTFUL_API_KEY=your-key-here
 ```
 
-**Step 3: Configure Your AI Assistant**
+To confirm a key is in place without printing it, use the CLI — `printful config get` masks the
+token, showing only the last four characters:
 
-<details>
-<summary><b>For Cursor</b></summary>
-
-Add to `~/.cursor/mcp.json`:
-```json
-{
-  "mcpServers": {
-    "printful": {
-      "command": "python",
-      "args": ["-m", "printful_mcp"],
-      "cwd": "/path/to/printful-ph-mcp",
-      "env": {
-        "PRINTFUL_API_KEY": "your-api-key-here"
-      }
-    }
-  }
-}
+```bash
+printful config get
 ```
-</details>
 
-<details>
-<summary><b>For Claude Desktop</b></summary>
+**Never echo, paste or commit the token.** `.env` is git-ignored; keep it that way.
 
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
-```json
-{
-  "mcpServers": {
-    "printful": {
-      "command": "python",
-      "args": ["-m", "printful_mcp"],
-      "cwd": "/path/to/printful-ph-mcp",
-      "env": {
-        "PRINTFUL_API_KEY": "your-api-key-here"
-      }
-    }
-  }
-}
-```
-</details>
-
-✅ **That's it!** Restart your AI assistant and start using Printful tools.
-
-</details>
+`printful config set api_key <token>` stores credentials outside the repository. Resolution
+order is explicit argument, then `PRINTFUL_API_KEY`, then the config file.
 
 ---
 
-## 🔌 Transport Options
+## Transports
 
-By default, the server uses **stdio** transport (required for Cursor/Claude Desktop). For HTTP clients or tools like mcporter, you can use HTTP transport.
+stdio is the default and is what Cursor, Claude Desktop and Claude Code use.
 
-<details>
-<summary><b>📡 Available Transports</b></summary>
+| Transport | Use case | Command |
+|---|---|---|
+| `stdio` (default) | Cursor, Claude Desktop, Claude Code | `python -m printful_mcp` |
+| `http` | HTTP clients, mcporter | `python -m printful_mcp --transport http` |
+| `sse` | Legacy SSE clients | `python -m printful_mcp --transport sse` |
 
-<br>
-
-| Transport | Use Case | Command |
-|-----------|----------|---------|
-| **stdio** (default) | Cursor, Claude Desktop | `python -m printful_mcp` |
-| **http** | HTTP clients, mcporter | `python -m printful_mcp --transport http` |
-| **sse** | Legacy SSE clients | `python -m printful_mcp --transport sse` |
-
-**HTTP Transport Example:**
 ```bash
-# Start server on port 8000
-python -m printful_mcp --transport http --port 8000
-
-# Or with custom host
+python -m printful_mcp --transport http --port 8000            # streamable-http on /mcp
 python -m printful_mcp --transport http --host 0.0.0.0 --port 8080
 ```
 
-**Using with mcporter:**
-```bash
-# Option 1: Use JSON args format (recommended)
-mcporter call printful_mcp.printful_list_catalog_products --args '{"limit":20}'
+Run `python -m printful_mcp --help` for the authoritative list of flags and defaults.
 
-# Option 2: Use typed values (colon for numbers)
-mcporter call printful_mcp.printful_get_product product_id:71
+**With mcporter,** pass arguments as JSON — this is why the tools take flattened string
+parameters (`items_json`, `variant_ids`) rather than nested objects; typed and nested
+parameters do not survive HTTP-to-stdio bridges:
+
+```bash
+mcporter call printful_mcp.printful_list_catalog_products --args '{"limit":20}'
 ```
+
+---
+
+## The 32 MCP tools
+
+**32 tools are registered, one per request builder the core defines.** That number is not
+maintained by hand. `src/printful_mcp/tests/test_server.py` asserts the builder-to-tool mapping
+in **both directions**, by set difference:
+
+- `test_every_core_endpoint_is_bound_by_a_tool` — a builder with no tool fails by name
+- `test_no_tool_calls_an_endpoint_that_does_not_exist` — a tool calling a missing builder fails
+- `test_one_registered_tool_per_bound_endpoint` — exactly one registration each
+
+The test's `UNBOUND_ON_PURPOSE` exemption list is currently empty, so "one tool per builder" is
+literally true. If you add a builder without a tool, the suite tells you which one. **The count
+is a consequence of that mapping, not a target** — if it changes, read the failure rather than
+editing a number.
+
+To print the registered names yourself:
+
+```bash
+.venv/bin/python -c "import asyncio;from printful_mcp.server import mcp;print(len(asyncio.run(mcp.list_tools())))"
+```
+
+<details>
+<summary><b>Catalog</b> — browse products, variants, pricing and stock</summary>
+
+`printful_list_catalog_products` · `printful_get_product` · `printful_get_product_variants` ·
+`printful_get_variant_prices` · `printful_get_product_availability` · `printful_list_categories` ·
+`printful_get_category` · `printful_get_size_guide`
 
 </details>
 
+<details>
+<summary><b>Orders</b> — draft, update, estimate, confirm, cancel</summary>
+
+`printful_create_order` · `printful_get_order` · `printful_update_order` ·
+`printful_confirm_order` · `printful_cancel_order` · `printful_list_orders` ·
+`printful_list_order_items` · `printful_list_order_shipments` ·
+`printful_create_estimation_task` · `printful_get_estimation_task`
+
+`printful_confirm_order` submits an order for fulfillment and **charges the account**.
+`printful_cancel_order` is likewise irreversible. Both are registered with
+`destructiveHint: true` so a client can prompt you first.
+
+</details>
+
+<details>
+<summary><b>Shipping and tax</b></summary>
+
+`printful_calculate_shipping` · `printful_list_countries` · `printful_calculate_tax`
+
+</details>
+
+<details>
+<summary><b>Mockups</b></summary>
+
+`printful_create_mockup_task` · `printful_get_mockup_task` · `printful_list_mockup_styles` ·
+`printful_list_mockup_templates`
+
+</details>
+
+<details>
+<summary><b>Files</b></summary>
+
+`printful_add_file` · `printful_get_file`
+
+</details>
+
+<details>
+<summary><b>Stores</b></summary>
+
+`printful_list_stores` · `printful_get_store_stats` · `printful_list_store_templates`
+
+</details>
+
+<details>
+<summary><b>Sync products</b> — v1, no v2 equivalent</summary>
+
+`printful_list_sync_products` · `printful_get_sync_product`
+
+</details>
+
+Every tool returns a string and takes a `format` parameter — `"markdown"` for a rendered table,
+`"json"` for the raw payload. Errors come back as readable text, never a traceback.
+
 ---
 
-## 🎨 What You Can Do
+## The CLI
 
-<div align="center">
+`printful` is the same core with a terminal in front of it. Called with no subcommand it opens
+an interactive REPL.
 
-| 🛍️ Catalog | 📦 Orders | 🚚 Shipping | 🖼️ Mockups | 📁 Files | 🏪 Stores |
-|:---------:|:--------:|:----------:|:---------:|:-------:|:--------:|
-| Browse 300+ products | Create & manage orders | Calculate rates | Generate mockups | Upload designs | View statistics |
-| Check availability | Confirm fulfillment | List countries | Check status | Get file info | Multi-store support |
-| Get pricing | Track orders | Delivery times | Custom placements | - | - |
+```text
+$ printful --help
+Commands:
+  catalog  Browse the Printful product catalog (v2).
+  config   Manage stored credentials and defaults.
+  draft    Build an order across multiple commands before submitting it.
+  files    File library.
+  mockup   Generate and inspect product mockups.
+  orders   Manage orders.
+  session  Inspect and manage persistent session state.
+  ship     Shipping rates, countries, and tax.
+  store    Store information and reporting.
+  sync     Sync products (v1 — not yet in v2).
+  test     Verify credentials against the live API.
+```
 
-</div>
+```bash
+printful catalog products --help     # every group takes --help
+printful ship countries
+printful catalog variants 71
+printful --json orders list          # machine-readable output
+```
+
+`orders confirm` and `orders cancel` require an explicit `--yes`. `confirm` charges the account.
+
+`printful test` makes a live API call to verify credentials; everything above except `--help`
+does too.
 
 ---
 
-## 💡 Usage Examples
+## Usage examples
 
-### 🎯 Example 1: Find the Perfect Product
+Ask your assistant in plain language; the tool calls below are what it reaches for.
+
+**"Show me all t-shirts available for DTG printing"**
 
 ```python
-# Ask your AI assistant:
-"Show me all t-shirts available for DTG printing under $15"
+printful_list_catalog_products(types="T-SHIRT", techniques="dtg", limit=20, format="markdown")
+```
 
-# It will use:
-printful_list_catalog_products(
-    types="T-SHIRT",
-    techniques="dtg",
-    limit=20,
-    format="markdown"
+**"What's the price for variant 4011 in USD?"**
+
+```python
+printful_get_variant_prices(variant_id=4011, currency="USD", format="markdown")
+```
+
+**"Generate a mockup for product 71 with my design"**
+
+```python
+printful_create_mockup_task(
+    product_id=71,
+    variant_ids="4011,4012",
+    design_url="https://example.com/design.png",
+    placement="front",
 )
 ```
 
-### 💰 Example 2: Get Pricing
+**"Create a draft order for John Doe"**
 
-```python
-# Ask your AI assistant:
-"What's the price for variant 4011 in USD?"
+`items_json` is required, and every item needs `placements` carrying the artwork — Printful
+rejects an order item with no design attached. The parameter takes a JSON array **as text**:
 
-# It will use:
-printful_get_variant_prices(
-    variant_id=4011,
-    currency="USD",
-    format="markdown"
-)
+```json
+[
+  {
+    "source": "catalog",
+    "catalog_variant_id": 4012,
+    "quantity": 1,
+    "placements": [
+      {
+        "placement": "front",
+        "technique": "dtg",
+        "layers": [{ "type": "file", "url": "https://example.com/art.png" }]
+      }
+    ]
+  }
+]
 ```
 
-### 📦 Example 3: Create an Order
-
 ```python
-# Ask your AI assistant:
-"Create a draft order for John Doe at 123 Main St, Los Angeles, CA 90001, one unit of variant 4012 with my design"
-
-# It will use:
 printful_create_order(
     recipient_name="John Doe",
     recipient_address1="123 Main St",
@@ -255,455 +394,245 @@ printful_create_order(
     recipient_state_code="CA",
     recipient_country_code="US",
     recipient_zip="90001",
-    items_json='[{"source": "catalog", "catalog_variant_id": 4012, "quantity": 1, '
-               '"placements": [{"placement": "front", "technique": "dtg", '
-               '"layers": [{"type": "file", "url": "https://example.com/art.png"}]}]}]'
+    items_json=items_json,
 )
 ```
 
-`items_json` is required, and every item needs `placements` carrying the artwork —
-Printful rejects an order item with no design attached.
-
-### 🎨 Example 4: Generate Product Mockups
-
-```python
-# Ask your AI assistant:
-"Generate a mockup for product 71 with my design"
-
-# It will use:
-printful_create_mockup_task(
-    product_id=71,
-    variant_ids="4011,4012",
-    design_url="https://example.com/design.png",
-    placement="front"
-)
-```
-
-<div align="center">
-
-### 🎬 **Want to see it in action?**
-
-[📺 Watch Demo Video](#) • [📖 Read Full Documentation](QUICKSTART.md) • [💬 Join Community](#)
-
-</div>
+This creates a **draft**. Nothing is charged until `printful_confirm_order`.
 
 ---
 
-## 🛠️ Available Tools
+## API version strategy
 
-<details>
-<summary><b>🛍️ Catalog Tools (5)</b> - Browse products & check availability</summary>
+`Request.version` selects the base URL and the transport unwraps the response.
 
-<br>
+**v2** (`https://api.printful.com/v2`) is the default and covers catalog, orders, shipping,
+mockups, files and store statistics. **v1** is used only where v2 has no equivalent: sync
+products, product templates and tax rates. v1 responses are unwrapped from
+`{"code": ..., "result": ...}` down to `result`.
 
-| Tool | Description | Example Use |
-|------|-------------|-------------|
-| `printful_list_catalog_products` | Browse 300+ products with filters | "Show me all hoodies" |
-| `printful_get_product` | Get detailed product info | "Tell me about product 71" |
-| `printful_get_product_variants` | Get all sizes/colors | "What sizes are available?" |
-| `printful_get_variant_prices` | Get pricing by currency | "How much in EUR?" |
-| `printful_get_product_availability` | Check stock status | "Is this in stock?" |
-
-</details>
-
-<details>
-<summary><b>📦 Order Tools (4)</b> - Create & manage orders</summary>
-
-<br>
-
-| Tool | Description | Example Use |
-|------|-------------|-------------|
-| `printful_create_order` | Create draft order | "Create order for John" |
-| `printful_get_order` | View order details | "Show me order #12345" |
-| `printful_confirm_order` | Start fulfillment | "Confirm this order" |
-| `printful_list_orders` | List all orders | "Show my recent orders" |
-
-</details>
-
-<details>
-<summary><b>🚚 Shipping Tools (2)</b> - Calculate rates & delivery</summary>
-
-<br>
-
-| Tool | Description | Example Use |
-|------|-------------|-------------|
-| `printful_calculate_shipping` | Get shipping rates & times | "How much to ship to UK?" |
-| `printful_list_countries` | List supported countries | "What countries do you ship to?" |
-
-</details>
-
-<details>
-<summary><b>🖼️ Mockup Tools (2)</b> - Generate product images</summary>
-
-<br>
-
-| Tool | Description | Example Use |
-|------|-------------|-------------|
-| `printful_create_mockup_task` | Generate mockup images | "Create mockup with my design" |
-| `printful_get_mockup_task` | Check generation status | "Is my mockup ready?" |
-
-</details>
-
-<details>
-<summary><b>📁 File Tools (2)</b> - Upload & manage designs</summary>
-
-<br>
-
-| Tool | Description | Example Use |
-|------|-------------|-------------|
-| `printful_add_file` | Upload design file | "Upload my logo" |
-| `printful_get_file` | Get file info & status | "Check file #12345" |
-
-</details>
-
-<details>
-<summary><b>🏪 Store Tools (2)</b> - Manage stores & stats</summary>
-
-<br>
-
-| Tool | Description | Example Use |
-|------|-------------|-------------|
-| `printful_list_stores` | List your stores | "Show all my stores" |
-| `printful_get_store_stats` | View sales & profit | "What are my sales?" |
-
-</details>
-
-<details>
-<summary><b>🔄 Sync Product Tools (2)</b> - Legacy v1 features</summary>
-
-<br>
-
-| Tool | Description | Example Use |
-|------|-------------|-------------|
-| `printful_list_sync_products` | List synced products | "Show my Etsy products" |
-| `printful_get_sync_product` | Get sync product details | "Details on sync #123" |
-
-</details>
+There is no automatic version negotiation — each endpoint builder declares the version it
+needs.
 
 ---
 
-## 🎓 Documentation
+## Rate limits
 
-<table>
-<tr>
-<td align="center" width="33%">
+Printful's general limit is 120 requests per 60 seconds. Mockup creation is limited far more
+tightly: **2 requests per 60 seconds for new stores**, with a 60-second lockout.
 
-### 📖 [Quick Start Guide](QUICKSTART.md)
-Get up and running in 5 minutes
+**The client does not retry.** On `429` (and `419`) it raises immediately, carrying the wait
+time into the error message, and gives up. There is no backoff, no sleep and no retry loop
+anywhere in `src/printful_core/transport.py`.
 
-</td>
-<td align="center" width="33%">
+This is deliberate, and it is the behavior you want: a silent retry against the mockup endpoint
+is exactly what walks you into the 60-second lockout. Your client sees the limit and can decide
+what to do, which is a decision a library should not make for you.
 
-### 🔑 [API Token Setup](API_TOKEN_SETUP.md)
-Detailed token configuration guide
-
-</td>
-<td align="center" width="33%">
-
-### 🧪 [Testing Guide](#testing)
-Learn how to test your integration
-
-</td>
-</tr>
-<tr>
-<td align="center" width="33%">
-
-### 🔐 [API Scopes Reference](API_SCOPES_REFERENCE.md)
-Required permissions explained
-
-</td>
-<td align="center" width="33%">
-
-### 💻 [Examples](#usage-examples)
-Real code examples
-
-</td>
-<td align="center" width="33%">
-
-### 🔧 [Cursor Config](cursor-mcp-config.json)
-Ready-to-use config file
-
-</td>
-</tr>
-</table>
+The wait time comes from Printful's `Retry-After` header when it sends one, and falls back to
+60 seconds when it does not — so treat the number as a floor, not a promise. Requests time out
+after 30 seconds.
 
 ---
 
-## 🔄 API Version Strategy
-
-This server uses **Printful API v2** (production-ready beta) with smart **v1 fallback**:
-
-<table>
-<tr>
-<td width="50%">
-
-**🎯 v2 (Primary)**
-- ✅ Catalog & Products
-- ✅ Orders & Fulfillment
-- ✅ Shipping Rates
-- ✅ Mockup Generation
-- ✅ File Management
-- ✅ Store Statistics
-
-</td>
-<td width="50%">
-
-**🔄 v1 (Fallback)**
-- ✅ Sync Products
-- ✅ Product Templates
-- ⚠️ Auto-switches when needed
-- 🚀 Future-proof architecture
-
-</td>
-</tr>
-</table>
-
-**Why v2?** Better pagination • Real-time stock • Enhanced orders • Improved security • Standardized formats
-
----
-
-## ⚙️ Rate Limiting & Performance
-
-<table>
-<tr>
-<td>
-
-**📊 Rate Limits**
-- 120 requests / 60 seconds
-- Leaky bucket algorithm
-- Auto-retry on 429 errors
-
-</td>
-<td>
-
-**🚀 Performance**
-- Response times: 100-500ms
-- Concurrent requests: Supported
-- Timeout handling: Built-in
-
-</td>
-</tr>
-</table>
-
----
-
-## 🐛 Troubleshooting
+## Troubleshooting
 
 <details>
-<summary><b>❌ "PRINTFUL_API_KEY environment variable is required"</b></summary>
+<summary><b>"PRINTFUL_API_KEY environment variable is required"</b></summary>
 
-<br>
-
-**Solution:** Make sure your API key is set in `.env` or passed via environment variables in the MCP config.
+The key is not reaching the process. Confirm it without printing it:
 
 ```bash
-# Check your .env file
-cat .env
-
-# Should contain:
-PRINTFUL_API_KEY=your-actual-key-here
+printful config get
 ```
 
-</details>
-
-<details>
-<summary><b>⏱️ "Rate limit exceeded"</b></summary>
-
-<br>
-
-**Solution:** Wait for the time specified in the error message (usually 60 seconds).
-
-- Default limit: 120 requests/minute
-- Consider implementing request batching
-- Check `X-Ratelimit-Reset` header for exact reset time
+Under an MCP client the key must be in the `env` block of the server entry — the client does
+not inherit your shell. In JSON it is a bare string with no surrounding quotes inside the
+value.
 
 </details>
 
 <details>
-<summary><b>🔍 "Resource not found"</b></summary>
+<summary><b>"Rate limit exceeded"</b></summary>
 
-<br>
-
-**Solution:** Double-check the ID you're using.
-
-- For orders: You can use external IDs by prefixing with `@` (e.g., `@my-order-123`)
-- For products: Verify the product/variant ID exists in the catalog
-- Check if the resource belongs to your store
+Stop and wait; do not retry in a loop. The error carries the wait time. If you hit this on
+mockups, note the new-store limit of 2 requests per 60 seconds and pause between bulk
+operations.
 
 </details>
 
 <details>
-<summary><b>🎨 Mockup generation stuck on "pending"</b></summary>
+<summary><b>"This endpoint requires 'store_id'!"</b></summary>
 
-<br>
+Your token is account-level. Export `PRINTFUL_STORE_ID` (or pass `--store-id`) so the
+`X-PF-Store-Id` header is sent. See [API_SCOPES_REFERENCE.md](API_SCOPES_REFERENCE.md).
 
-**Solution:** Mockup generation typically takes 10-30 seconds.
+</details>
 
-- Wait at least 30 seconds before checking status
-- If stuck longer than 2 minutes, check task status - it may have failed
-- Verify your design URL is publicly accessible
+<details>
+<summary><b>"Resource not found"</b></summary>
+
+Check the ID. Orders accept external IDs prefixed with `@` (`@my-order-123`). Verify the
+resource belongs to the store the token is scoped to.
+
+</details>
+
+<details>
+<summary><b>The server starts in a terminal but not in the client</b></summary>
+
+Almost always a `PATH` problem: `"command": "python"` resolves to whichever interpreter the
+client happens to find, which is usually not the one you installed into. Use an absolute path
+to `.venv/bin/printful-mcp`.
+
+</details>
+
+<details>
+<summary><b>Mockup generation stuck on "pending"</b></summary>
+
+Generation is asynchronous; poll `printful_get_mockup_task`. Verify the design URL is publicly
+reachable. A task still pending after a couple of minutes has most likely failed.
 
 </details>
 
 ---
 
-## 🧪 Testing
-
-<div align="center">
-
-### Choose Your Testing Method
-
-</div>
-
-<table>
-<tr>
-<td align="center" width="33%">
-
-### ⚡ **Quick Test**
-Automated test suite
+## Testing
 
 ```bash
-.venv/bin/python -m pytest
+.venv/bin/python -m pytest              # offline suite — no network, no credentials
+.venv/bin/python -m pytest -m live      # live API suite (spends real requests)
+.venv/bin/python -m pytest -m ""        # everything
 ```
 
-✅ Runs the full offline suite
-⏱️ No credentials needed
+Two traps, both of which have cost real time:
 
-</td>
-<td align="center" width="33%">
+**Use `.venv/bin/python -m pytest`, not a bare `pytest`.** A bare invocation runs whichever
+interpreter comes first on `PATH`, which is usually not the one holding this project's
+dependencies. What breaks is machine-specific — a plugin registered in some other
+interpreter's global site-packages can abort collection before a single test runs, and the
+traceback that follows is about that interpreter, not about this repository.
 
-### 🌐 **Interactive Test**
-Web-based MCP Inspector
+**`env -u PRINTFUL_API_KEY pytest` does not prove the offline suite is credential-free.**
+`server.py` calls `load_dotenv()` at import, so a `.env` in the repository root puts the
+variable straight back the moment any test imports the server, and the run passes for the wrong
+reason. Take `.env` out of the picture instead:
+
+```bash
+mv .env .env.aside && .venv/bin/python -m pytest -q; mv .env.aside .env
+```
+
+Note the `;` before the restore, so `.env` comes back even when the suite fails.
+
+**Do not pass a directory path to run "the suite."** A path argument overrides `testpaths`, so
+`pytest tests/` collects a handful of cases, reports them as passing, and runs none of the MCP
+adapter tests. A path to a single file is fine when you mean it.
+
+Live tests are excluded from the default selection by `addopts = "-m 'not live'"` so a fresh
+clone gets a clean result. They are not softened: selected without credentials they fail loudly
+rather than skip. The live suite needs `PRINTFUL_STORE_ID` exported as well as
+`PRINTFUL_API_KEY`. `printful_confirm_order` is never exercised against the live API — it
+charges a real account, and is asserted only against fake transports.
+
+For an interactive tool browser:
 
 ```bash
 export PRINTFUL_API_KEY=your-key
-./test-with-inspector.sh
+./test-with-inspector.sh          # npx @modelcontextprotocol/inspector, UI on :5173
 ```
 
-🎯 Test any tool visually
-🌍 Opens at localhost:5173
-
-</td>
-<td align="center" width="33%">
-
-### 🤖 **Live Test**
-In Claude/Cursor
-
-Just ask:
-
-```
-"List Printful countries"
-```
-
-💬 Natural language
-✨ Real integration test
-
-</td>
-</tr>
-</table>
-
-**📖 Full testing guide:** See [CLAUDE.md](CLAUDE.md#tests) for comprehensive testing instructions.
+[CLAUDE.md](CLAUDE.md) carries the full working notes for this repository.
 
 ---
 
-## 🏗️ Project Structure
+## Project structure
 
+```text
+printful-mcp/
+├── src/
+│   ├── printful_core/        what a Printful call IS (no I/O except transport.py)
+│   │   ├── request.py        Request: a frozen description of an un-sent call
+│   │   ├── endpoints/        pure functions returning a Request — no I/O
+│   │   ├── transport.py      SyncTransport / AsyncTransport — the only network module
+│   │   ├── errors.py         PrintfulError and envelope normalization for both versions
+│   │   ├── auth.py           Credentials.resolve()
+│   │   ├── pagination.py     page arithmetic as pure functions
+│   │   ├── polling.py        poll an async task until it leaves "pending"
+│   │   └── format/           markdown.py for the MCP tools, summary.py for the CLI
+│   ├── printful_mcp/         MCP server — async, returns str
+│   │   ├── server.py         the MCP surface: 32 @mcp.tool delegates, no business logic
+│   │   ├── tools/            one module per domain
+│   │   ├── models/inputs.py  one Pydantic model per tool
+│   │   └── transport.py      lazily-initialized transport, closed via atexit
+│   └── printful_cli/         Click CLI — sync, prints tables
+├── skills/                   printful-mcp and printful-cli skills (symlinked SKILL.md)
+├── .claude-plugin/           plugin.json and marketplace.json
+├── .codex-plugin/            plugin.json and INSTALL.md
+├── .mcp.json                 uvx-based zero-install server entry
+├── scripts/bump-version.sh   version bump across the manifests
+├── pyproject.toml
+└── LICENSE
 ```
-printful-ph-mcp/
-├── 📁 src/
-│   └── 📁 printful_mcp/
-│       ├── 🐍 server.py          # FastMCP server + tool registrations
-│       ├── 🔌 client.py          # API client with auth/error handling
-│       ├── 📁 tools/             # Tool implementations by domain
-│       │   ├── 🛍️ catalog.py    # Product browsing (5 tools)
-│       │   ├── 📦 orders.py     # Order management (4 tools)
-│       │   ├── 🚚 shipping.py   # Shipping rates (2 tools)
-│       │   ├── 🖼️ mockups.py    # Mockup generation (2 tools)
-│       │   ├── 📁 files.py      # File management (2 tools)
-│       │   ├── 🏪 stores.py     # Store statistics (2 tools)
-│       │   └── 🔄 sync.py       # v1 fallback (2 tools)
-│       └── 📁 models/
-│           └── 📋 inputs.py      # Pydantic input models
-├── 📄 pyproject.toml
-├── 🔐 .env.example
-└── 📖 README.md
-```
+
+Tests live beside the code they test, in `src/*/tests/`.
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
-We welcome contributions! Here's how you can help:
+Issues and pull requests are welcome on
+[this fork](https://github.com/crichalchemist/printful-mcp/issues). Changes that belong
+upstream are offered to [Purple-Horizons/printful-mcp](https://github.com/Purple-Horizons/printful-mcp).
 
-<table>
-<tr>
-<td width="50%">
+Before opening a pull request:
 
-### 🐛 **Report Bugs**
-Found an issue? [Open a bug report](https://github.com/Purple-Horizons/printful-ph-mcp/issues/new?labels=bug)
+```bash
+.venv/bin/python -m pytest
+.venv/bin/python -m ruff check src/
+.venv/bin/python -m ruff format --check src/
+```
 
-### ✨ **Request Features**
-Have an idea? [Suggest a feature](https://github.com/Purple-Horizons/printful-ph-mcp/issues/new?labels=enhancement)
+Those are scoped to `src/`, which is clean, because the repository-wide form is not clean yet:
+`ruff check .` reports two findings in `tests/test_create_order.py`, and `ruff format --check .`
+would reformat that file plus three planning documents under `docs/superpowers/plans/`. Those
+are known and are being cleaned up separately — do not treat them as something your change
+broke, and do not fix them in an unrelated pull request.
 
-</td>
-<td width="50%">
-
-### 🔧 **Submit PRs**
-1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push and open a Pull Request
-
-</td>
-</tr>
-</table>
+Adding an MCP tool means touching three files, in this order: `models/inputs.py`,
+`tools/<domain>.py`, then a delegate in `server.py`. The parity test will tell you if you
+missed one.
 
 ---
 
-## 📚 Resources & Links
-
-<div align="center">
+## Resources
 
 | Resource | Link |
-|:--------:|:----:|
-| 📘 **Printful API v2 Docs** | [developers.printful.com/docs/v2-beta](https://developers.printful.com/docs/v2-beta/) |
-| 📗 **Printful API v1 Docs** | [developers.printful.com/docs](https://developers.printful.com/docs/) |
-| 🔌 **MCP Protocol Spec** | [modelcontextprotocol.io](https://modelcontextprotocol.io/) |
-| 🐍 **FastMCP Framework** | [github.com/modelcontextprotocol/python-sdk](https://github.com/modelcontextprotocol/python-sdk) |
-| 🎨 **Purple Horizons** | [purplehorizons.io](https://purplehorizons.io) |
-| 👨‍💻 **Made by Gianni** | [giannidalerta.com](https://giannidalerta.com) |
+|---|---|
+| Printful API v2 docs | [developers.printful.com/docs/v2-beta](https://developers.printful.com/docs/v2-beta/) |
+| Printful API v1 docs | [developers.printful.com/docs](https://developers.printful.com/docs/) |
+| MCP specification | [modelcontextprotocol.io](https://modelcontextprotocol.io/) |
+| MCP Python SDK | [github.com/modelcontextprotocol/python-sdk](https://github.com/modelcontextprotocol/python-sdk) |
+| Upstream project | [Purple-Horizons/printful-mcp](https://github.com/Purple-Horizons/printful-mcp) |
+| Purple Horizons | [purplehorizons.io](https://purplehorizons.io) |
+| Gianni D'Alerta | [giannidalerta.com](https://giannidalerta.com) |
 
-</div>
-
----
-
-## 📄 License
-
-<div align="center">
-
-**MIT License** - Free to use, modify, and distribute
-
-[View License](LICENSE) • [Purple Horizons LLC](https://purplehorizons.io) • 2026
-
-</div>
+Also in this repository: [QUICKSTART.md](QUICKSTART.md),
+[API_TOKEN_SETUP.md](API_TOKEN_SETUP.md), [API_SCOPES_REFERENCE.md](API_SCOPES_REFERENCE.md),
+[CLAUDE.md](CLAUDE.md).
 
 ---
 
-## 💝 Support This Project
+## License
+
+**MIT** — see [LICENSE](LICENSE). Original work © Purple Horizons LLC.
+
+---
 
 <div align="center">
 
-### If this project helped you, consider:
+### Support this project
 
-⭐ **Star this repo** on GitHub
-
-🐦 **Share it** on social media
-
-🤝 **Contribute** to the codebase
-
-🎨 **Sign up for Printful** using our affiliate link
-
-<br>
+Star the repo · share it · contribute · or sign up for Printful through the referral link
+below, which supports the upstream author.
 
 <a href="https://www.printful.com/a/purplehorizons">
   <img src="https://img.shields.io/badge/Try_Printful-Start_Free-FA4616?style=for-the-badge&logo=printful&logoColor=white" alt="Try Printful">
@@ -711,20 +640,6 @@ Have an idea? [Suggest a feature](https://github.com/Purple-Horizons/printful-ph
 
 <br><br>
 
-**Made with ❤️ by [Purple Horizons](https://purplehorizons.io)**
-
-*Empowering businesses through AI automation*
-
-</div>
-
----
-
-<div align="center">
-
-### 🚀 Ready to automate your print-on-demand business?
-
-[**Get Started Now**](#installation) • [**View Examples**](#usage-examples) • [**Read Docs**](QUICKSTART.md)
-
-<sub>Questions? Issues? [Open an issue](https://github.com/Purple-Horizons/printful-ph-mcp/issues) or [contact us](https://purplehorizons.io)</sub>
+**Originally made by [Purple Horizons](https://purplehorizons.io)**
 
 </div>

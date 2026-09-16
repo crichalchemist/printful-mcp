@@ -25,10 +25,20 @@ before the server starts.
 .venv/bin/python -m pytest src/printful_mcp/tests/test_server.py -v   # one file
 ```
 
-**Use `.venv/bin/python -m pytest`, not a bare `pytest`.** A bare invocation resolves to the
-system interpreter, whose global site-packages registers a `langsmith` plugin that crashes in
-`pytest_cmdline_parse` before collecting anything. That traceback is the interpreter, not this
-repository.
+**Use `.venv/bin/python -m pytest`, not a bare `pytest`.** A bare invocation runs whichever
+interpreter is first on `PATH`, not this project's venv, so what breaks depends on what that
+interpreter happens to have installed — the symptoms are machine-specific and have changed more
+than once. Today they are the `TestCLISubprocess` cases in
+`src/printful_cli/tests/test_full_e2e.py`, where `_resolve_cli` (`:60`) falls back to
+`[sys.executable, "-m", module]` and that interpreter cannot import `printful_cli`, plus
+`TestCLIGuards.test_confirm_refusal_mentions_charging` and
+`test_cancel_without_yes_exits_nonzero` in `src/printful_cli/tests/test_core.py`, which fail on a
+different `click` with `I/O operation on closed file`.
+
+**Those last two are the order-confirmation charge guards**, so a bare invocation shows the
+safety tests for a billable operation red and invites the conclusion that the guard is broken.
+It is not; the interpreter is wrong. Note also that `source .venv/bin/activate` does not persist
+between an agent's tool calls, so the explicit path is the correct form regardless.
 
 **Do not pass a directory path to run "the suite."** An explicit path argument overrides
 `testpaths`, so `pytest tests/` collects three cases out of the whole suite, reports
@@ -56,6 +66,19 @@ is fine — that's running one file on purpose, not standing in for the suite.)
 - **Mockup creation is opt-in behind `PRINTFUL_E2E_MOCKUPS=1`.** Printful rate-limits new stores
   to 2 requests per 60 seconds with a 60-second lockout. Do not set the flag to make more tests
   run.
+
+### Lint
+
+```bash
+.venv/bin/ruff check src/            # lint
+.venv/bin/ruff format --check src/   # formatting, non-mutating
+.venv/bin/ruff format src/           # formatting, applied
+```
+
+Both gates must be clean before a commit. The selected rules and the 100-column line length
+live in `pyproject.toml` under `[tool.ruff]` — change them there, not with per-file ignores.
+There is no CI workflow and no pre-commit hook in this repository, so nothing runs these for
+you.
 
 ## Architecture
 
@@ -191,9 +214,14 @@ Match the dominant pattern in new code; leave these as they are unless the task 
 
 ## Related files
 
+- `AGENTS.md` — the cross-tool entry point other agents look for. A pointer to this file, not a
+  copy of it; keep it that way, because two files with the same content drift.
 - `.cursor/skills/printful-mcp/SKILL.md` — guidance for the *consuming* assistant (tool
-  reference, workflows, troubleshooting), not for working on this codebase. It is stale on tool
-  names and parameters; update it when those change.
+  reference, workflows, troubleshooting), not for working on this codebase. Its tool reference
+  is kept one-to-one with the registered surface; if you add or rename a tool, add or rename the
+  entry in the same commit.
+- `src/printful_cli/skills/SKILL.md` — the same thing for the CLI surface: command groups,
+  agent rules, and the guards on billable operations.
 - `API_TOKEN_SETUP.md` / `API_SCOPES_REFERENCE.md` — which token scopes each tool group needs.
 - `docs/superpowers/specs/` and `docs/superpowers/plans/` — the design and execution record for
   the core extraction and the MCP rebuild.

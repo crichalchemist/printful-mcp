@@ -10,7 +10,9 @@ API. Browse the catalog, build and place orders, calculate shipping, and generat
 mockups from the shell or from an agent — with a REPL for multi-step work.
 
 The backend is the hosted Printful REST API (v2, with v1 fallback for tax, product
-templates, and sync products). Every command makes a live API call.
+templates, and sync products). Most commands make a live API call. The exceptions
+are purely local: the `draft`, `session` and `config` groups, `files list`, and
+anything run under `--dry-run`.
 
 ## ⚠️ Read this before running any command
 

@@ -662,6 +662,18 @@ def test_a_failed_mockup_task_lists_why_not_just_that_it_failed():
     assert "**Status:** failed" in out
 
 
+def test_a_failed_mockup_task_with_no_reasons_skips_the_heading_entirely():
+    """The API does not always say why. `failure_reasons` gates the
+    `**Reasons:**` heading, and a heading with nothing under it reads as a
+    rendering bug to a caller who then goes looking for the list that is not
+    there. The failure itself must still be reported.
+    """
+    out = markdown.mockup_task({"id": "task-4", "status": "failed"})
+    assert "**Reasons:**" not in out
+    assert "\u274c Mockup generation failed." in out
+    assert "**Status:** failed" in out
+
+
 def test_a_mockup_style_row_carries_the_id_a_caller_requests_by():
     """`printful_create_mockup_task` takes style ids from this list --
     losing `id` here means a caller can name a style but not order it.

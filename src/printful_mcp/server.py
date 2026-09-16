@@ -22,6 +22,10 @@ from .models.inputs import (
     GetOrderInput,
     ConfirmOrderInput,
     ListOrdersInput,
+    UpdateOrderInput,
+    CancelOrderInput,
+    ListOrderItemsInput,
+    ListOrderShipmentsInput,
     CalculateShippingInput,
     CreateMockupTaskInput,
     GetMockupTaskInput,
@@ -296,6 +300,75 @@ async def printful_list_orders(params: ListOrdersInput) -> str:
     Returns paginated list of orders with status, costs, and item counts.
     """
     return await orders.list_orders(get_transport(), params)
+
+
+@mcp.tool(
+    name="printful_update_order",
+    annotations={
+        "title": "Update Draft Order",
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": False,
+        "openWorldHint": True,
+    }
+)
+async def printful_update_order(params: UpdateOrderInput) -> str:
+    """
+    Update a draft order. Only drafts can be changed.
+    """
+    return await orders.update_order(get_transport(), params)
+
+
+@mcp.tool(
+    name="printful_cancel_order",
+    annotations={
+        "title": "Cancel Order",
+        "readOnlyHint": False,
+        "destructiveHint": True,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    }
+)
+async def printful_cancel_order(params: CancelOrderInput) -> str:
+    """
+    Cancel an order. A draft is discarded; a confirmed order is cancelled if it
+    has not entered fulfillment. This cannot be undone.
+    """
+    return await orders.cancel_order(get_transport(), params)
+
+
+@mcp.tool(
+    name="printful_list_order_items",
+    annotations={
+        "title": "List Order Items",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    }
+)
+async def printful_list_order_items(params: ListOrderItemsInput) -> str:
+    """
+    List the items on an order.
+    """
+    return await orders.list_order_items(get_transport(), params)
+
+
+@mcp.tool(
+    name="printful_list_order_shipments",
+    annotations={
+        "title": "List Order Shipments",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    }
+)
+async def printful_list_order_shipments(params: ListOrderShipmentsInput) -> str:
+    """
+    List the shipments for an order, with tracking numbers.
+    """
+    return await orders.list_order_shipments(get_transport(), params)
 
 
 # ========== SHIPPING TOOLS ==========

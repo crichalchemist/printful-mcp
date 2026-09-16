@@ -129,6 +129,40 @@ class ListOrdersInput(BaseModel):
     format: Literal["markdown", "json"] = Field(default="markdown", description="Output format")
 
 
+class UpdateOrderInput(BaseModel):
+    """Input for printful_update_order."""
+    order_id: str = Field(description="Order ID or external ID (prefix with @)")
+    changes_json: str = Field(
+        description=(
+            "JSON object of fields to change. Only draft orders can be updated. "
+            'Example: {"recipient":{"address1":"2 New Street"}}'
+        ),
+    )
+    format: Literal["markdown", "json"] = Field(
+        default="markdown", description="Response format")
+
+
+class CancelOrderInput(BaseModel):
+    """Input for printful_cancel_order."""
+    order_id: str = Field(description="Order ID or external ID (prefix with @)")
+    format: Literal["markdown", "json"] = Field(
+        default="markdown", description="Response format")
+
+
+class ListOrderItemsInput(BaseModel):
+    """Input for printful_list_order_items."""
+    order_id: str = Field(description="Order ID or external ID (prefix with @)")
+    format: Literal["markdown", "json"] = Field(
+        default="markdown", description="Response format")
+
+
+class ListOrderShipmentsInput(BaseModel):
+    """Input for printful_list_order_shipments."""
+    order_id: str = Field(description="Order ID or external ID (prefix with @)")
+    format: Literal["markdown", "json"] = Field(
+        default="markdown", description="Response format")
+
+
 # Shipping Models
 class CalculateShippingInput(BaseModel):
     """Input for calculating shipping rates."""

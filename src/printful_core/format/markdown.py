@@ -259,3 +259,39 @@ def orders(data: Dict[str, Any]) -> str:
             f"",
         ])
     return "\n".join(lines)
+
+
+def order_items(data: Dict[str, Any], order_id: str) -> str:
+    """The items on one order."""
+    rows = data.get('data', [])
+    lines = [f"# Items on Order {order_id} ({len(rows)})", f""]
+    for row in rows:
+        lines.extend([
+            f"## Item {row.get('id')}",
+            f"- **Name:** {row.get('name', 'N/A')}",
+            f"- **Variant:** {row.get('catalog_variant_id', 'N/A')}",
+            f"- **Quantity:** {row.get('quantity')}",
+            f"- **Price:** {row.get('price', 'N/A')} {row.get('currency', '')}",
+            f"",
+        ])
+    return "\n".join(lines)
+
+
+def shipments(data: Dict[str, Any], order_id: str) -> str:
+    """The shipments for one order."""
+    rows = data.get('data', [])
+    if not rows:
+        return (f"# Shipments for Order {order_id}\n\n"
+                "No shipments yet. Shipments appear once the order is fulfilled.")
+    lines = [f"# Shipments for Order {order_id} ({len(rows)})", f""]
+    for row in rows:
+        lines.extend([
+            f"## Shipment {row.get('id')}",
+            f"- **Carrier:** {row.get('carrier', 'N/A')}",
+            f"- **Service:** {row.get('service', 'N/A')}",
+            f"- **Tracking number:** {row.get('tracking_number', 'N/A')}",
+            f"- **Tracking URL:** {row.get('tracking_url', 'N/A')}",
+            f"- **Shipped at:** {row.get('shipped_at', 'not yet')}",
+            f"",
+        ])
+    return "\n".join(lines)

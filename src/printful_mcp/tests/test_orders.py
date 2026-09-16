@@ -3,9 +3,12 @@ import json
 
 from printful_core.errors import PrintfulError
 from printful_mcp.models.inputs import (
+    CancelOrderInput,
     ConfirmOrderInput,
     CreateOrderInput,
+    ListOrderShipmentsInput,
     ListOrdersInput,
+    UpdateOrderInput,
 )
 from printful_mcp.tools import orders
 
@@ -90,3 +93,55 @@ async def test_the_order_list_shows_each_orders_status(transport):
                                  "paging": {"total": 1, "offset": 0, "limit": 20}})
     out = await orders.list_orders(transport, ListOrdersInput())
     assert "- **Status:** draft" in out
+
+
+async def test_an_update_sends_a_patch_with_only_the_changed_fields(transport):
+    """A PUT-shaped update would blank every field the caller omitted."""
+    # Queue a renderable body: update_order renders markdown.order(), which reads
+    # id/status/created_at/updated_at unguarded. The empty-queue default
+    # {"data": {}} would raise KeyError inside the tool's try, and `except
+    # PrintfulError` does not catch it -- the failure would read as a tool bug.
+    transport._responses.append({"data": {"id": 42, "status": "draft",
+                                          "created_at": "2026-01-01",
+                                          "updated_at": "2026-01-01"}})
+    await orders.update_order(transport, UpdateOrderInput(
+        order_id="42", changes_json='{"recipient":{"address1":"2 New Street"}}'))
+    assert transport.last.method == "PATCH"
+    assert transport.last.path == "/orders/42"
+    assert transport.last.json == {"recipient": {"address1": "2 New Street"}}
+
+
+async def test_an_empty_update_is_refused_before_sending(transport):
+    """The core refuses a no-op PATCH; the tool must report it, not crash.
+
+    `update_order` raises ValueError on an empty change set, which is not a
+    PrintfulError and escapes a body that catches only that.
+    """
+    out = await orders.update_order(
+        transport, UpdateOrderInput(order_id="42", changes_json="{}"))
+    assert out.startswith("Error:")
+    assert transport.sent == []
+
+
+async def test_malformed_update_json_is_reported_not_raised(transport):
+    out = await orders.update_order(
+        transport, UpdateOrderInput(order_id="42", changes_json="not json"))
+    assert "valid JSON" in out
+    assert transport.sent == []
+
+
+async def test_cancel_sends_a_delete(transport):
+    """Cancel is destructive; the verb is what makes it so."""
+    transport._responses.append({"data": {"id": 42}})
+    out = await orders.cancel_order(transport, CancelOrderInput(order_id="42"))
+    assert transport.last.method == "DELETE"
+    assert transport.last.path == "/orders/42"
+    assert "cancelled" in out
+
+
+async def test_an_unshipped_order_says_so_rather_than_showing_an_empty_heading(transport):
+    """`{"data": []}` is the normal answer for an order still in production."""
+    transport._responses.append({"data": []})
+    out = await orders.list_order_shipments(
+        transport, ListOrderShipmentsInput(order_id="42"))
+    assert "No shipments yet" in out

@@ -8,10 +8,14 @@ from printful_core.format import markdown
 from printful_core.transport import AsyncTransport
 
 from ..models.inputs import (
+    CancelOrderInput,
     ConfirmOrderInput,
     CreateOrderInput,
     GetOrderInput,
+    ListOrderItemsInput,
     ListOrdersInput,
+    ListOrderShipmentsInput,
+    UpdateOrderInput,
 )
 
 PLACEMENTS_HINT = (
@@ -111,5 +115,73 @@ async def list_orders(transport: AsyncTransport, params: ListOrdersInput) -> str
         if params.format == "json":
             return json.dumps(data, indent=2)
         return markdown.orders(data)
+    except PrintfulError as e:
+        return f"Error: {e.message}"
+
+
+async def update_order(transport: AsyncTransport, params: UpdateOrderInput) -> str:
+    """
+    Update a draft order.
+
+    Only draft orders can be changed. Pass the fields to change as JSON.
+    """
+    try:
+        changes = json.loads(params.changes_json)
+    except json.JSONDecodeError as e:
+        return f"Error: changes_json must be valid JSON ({e})."
+    if not isinstance(changes, dict):
+        return "Error: changes_json must be a JSON object of fields to change."
+
+    try:
+        data = await transport.send(orders.update_order(params.order_id, changes))
+        if params.format == "json":
+            return json.dumps(data, indent=2)
+        return markdown.order(data.get("data", {}))
+    except ValueError as e:
+        return f"Error: {e}"
+    except PrintfulError as e:
+        return f"Error: {e.message}"
+
+
+async def cancel_order(transport: AsyncTransport, params: CancelOrderInput) -> str:
+    """
+    Cancel an order.
+
+    A draft is discarded. A confirmed order is cancelled if it has not yet
+    entered fulfillment. This cannot be undone.
+    """
+    try:
+        data = await transport.send(orders.cancel_order(params.order_id))
+        if params.format == "json":
+            return json.dumps(data, indent=2)
+        body = data.get("data", {})
+        return f"✓ Order {body.get('id', params.order_id)} cancelled."
+    except PrintfulError as e:
+        return f"Error: {e.message}"
+
+
+async def list_order_items(transport: AsyncTransport, params: ListOrderItemsInput) -> str:
+    """
+    List the items on an order.
+    """
+    try:
+        data = await transport.send(orders.list_items(params.order_id))
+        if params.format == "json":
+            return json.dumps(data, indent=2)
+        return markdown.order_items(data, params.order_id)
+    except PrintfulError as e:
+        return f"Error: {e.message}"
+
+
+async def list_order_shipments(transport: AsyncTransport,
+                               params: ListOrderShipmentsInput) -> str:
+    """
+    List the shipments for an order, with tracking numbers.
+    """
+    try:
+        data = await transport.send(orders.list_shipments(params.order_id))
+        if params.format == "json":
+            return json.dumps(data, indent=2)
+        return markdown.shipments(data, params.order_id)
     except PrintfulError as e:
         return f"Error: {e.message}"

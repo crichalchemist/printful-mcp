@@ -136,9 +136,17 @@ class PrintfulClient:
                 status_code=response.status_code
             )
         
-        # v2 API uses RFC 9457 format
+        # v2 is documented as RFC 9457, but the live API returns the v1-style
+        # envelope ({"data": "...", "error": {"reason", "message"}}) for 4xx
+        # and 404 alike, so read that first and fall back to the documented
+        # shape. Verified against live 400 and 404 responses.
         if version == "v2":
-            error_msg = error_data.get("detail", error_data.get("title", "Unknown error"))
+            error_msg = (
+                error_data.get("error", {}).get("message")
+                or error_data.get("detail")
+                or error_data.get("title")
+                or "Unknown error"
+            )
             raise PrintfulAPIError(
                 error_msg,
                 status_code=response.status_code,

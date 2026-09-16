@@ -851,6 +851,40 @@ def test_a_store_row_carries_the_id_and_type_a_caller_switches_context_by():
     assert "# Stores (2 total)" in out
 
 
+def test_a_store_with_no_activity_shows_no_metric_sections_at_all():
+    """Each of the four metric sections is gated on its own key. A brand-new
+    store returns none of them, and a heading with no figure under it reads
+    as a rendering fault to a seller who then goes looking for numbers that
+    were never sent. The requested window must still print, because that is
+    the only thing saying which period came back empty.
+    """
+    out = markdown.store_statistics(
+        {"data": {"store_id": 9001, "currency": "USD"}},
+        date_from="2026-09-01",
+        date_to="2026-09-16",
+    )
+    assert "## Profit" not in out
+    assert "## Total Paid Orders" not in out
+    assert "## Printful Costs" not in out
+    assert "## Average Fulfillment Time" not in out
+    assert "# Store Statistics (2026-09-01 to 2026-09-16)" in out
+    assert "**Store ID:** 9001" in out
+
+
+def test_a_sync_product_with_no_variants_omits_the_variants_section():
+    """`sync_variants` gates the whole section. A sync product can exist with
+    none -- an empty '## Sync Variants (0)' heading tells a caller variants
+    were fetched and found empty, when in fact none were returned at all.
+    """
+    out = markdown.sync_product(
+        {"sync_product": {"id": 8001, "name": "Tee", "external_id": "ext-1"}}
+    )
+    assert "## Sync Variants" not in out
+    assert "# Tee" in out
+    assert "**Sync Product ID:** 8001" in out
+    assert "**External ID:** ext-1" in out
+
+
 def test_store_statistics_header_carries_the_requested_window_not_the_body():
     """`store_statistics` takes `date_from`/`date_to` as arguments because
     the response body does not carry the range back -- the header must

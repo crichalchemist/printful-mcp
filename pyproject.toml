@@ -42,7 +42,6 @@ dependencies = [
     "python-dotenv>=1.0.0",
     # printful_cli (src/printful_cli)
     "click>=8.0.0",
-    "prompt_toolkit>=3.0.0",
 ]
 
 [project.optional-dependencies]

@@ -9,15 +9,22 @@ from __future__ import annotations
 import json
 import os
 from datetime import datetime
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-DEFAULT_SESSION_FILE = str(Path.home() / ".cli-anything-printful" / "session.json")
+from printful_core.auth import CONFIG_DIR
+
+# Beside the core's config.json, in the one directory CONFIG_DIR owns. Two
+# literals for one directory is the drift this refactor exists to remove.
+DEFAULT_SESSION_FILE = str(CONFIG_DIR / "session.json")
 MAX_HISTORY = 50
 
 
 def _locked_save_json(path: str, data: Any, **dump_kwargs) -> None:
-    """Atomically write JSON with an exclusive file lock."""
+    """Atomically write JSON with an exclusive file lock.
+
+    Chmod 0600 to match the config file it now sits beside: the session holds
+    the recipient block — name, address, email, phone.
+    """
     try:
         f = open(path, "r+")
     except FileNotFoundError:
@@ -42,6 +49,10 @@ def _locked_save_json(path: str, data: Any, **dump_kwargs) -> None:
                 import fcntl
 
                 fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass
 
 
 class DraftOrder:

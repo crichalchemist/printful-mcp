@@ -26,10 +26,9 @@ from printful_cli.core import catalog as catalog_mod
 from printful_cli.core import orders as orders_mod
 from printful_cli.core import shipping as shipping_mod
 from printful_cli.core import stores as stores_mod
-from printful_cli.utils.printful_backend import (
-    PrintfulBackend,
-    PrintfulError,
-)
+from printful_core.auth import Credentials
+from printful_core.errors import PrintfulError
+from printful_core.transport import SyncTransport
 
 MOCKUPS_ENABLED = os.environ.get("PRINTFUL_E2E_MOCKUPS", "").strip() == "1"
 
@@ -71,6 +70,8 @@ def _resolve_cli(name):
         return [path]
     if force:
         raise RuntimeError(f"{name} not found in PATH. Install with: pip install -e .")
+    # Hardcoded on purpose: the command is `printful` while the package keeps
+    # its `_cli` suffix, so no derivation from `name` produces the right module.
     module = "printful_cli.printful_cli"
     print(f"[_resolve_cli] Falling back to: {sys.executable} -m {module}")
     return [sys.executable, "-m", module]
@@ -88,20 +89,19 @@ def _require_credentials():
 
 
 @pytest.fixture(scope="module")
-def backend():
+def transport():
     _require_credentials()
-    client = PrintfulBackend()
+    client = SyncTransport(Credentials.resolve())
     yield client
     client.close()
 
 
 @pytest.fixture(scope="module")
-def known_variant_id(backend):
+def known_variant_id(transport):
     """Discover a real variant ID rather than hardcoding one."""
-    data = catalog_mod.list_variants(backend, KNOWN_PRODUCT_ID, limit=1)
-    variants = data.get("data", []) or []
-    assert variants, "Expected at least one variant for product 71"
-    return variants[0]["id"]
+    summary = catalog_mod.list_variants(transport, KNOWN_PRODUCT_ID, limit=1)
+    assert summary["variants"], "Expected at least one variant for product 71"
+    return summary["variants"][0]["id"]
 
 
 # --------------------------------------------------------------------------
@@ -110,94 +110,83 @@ def known_variant_id(backend):
 
 @pytest.mark.live
 class TestLiveReadOnly:
-    def test_countries_includes_us(self, backend):
+    def test_countries_includes_us(self, transport):
         """The full country set must be returned, not just the first page.
 
         /v2/countries paginates at 20 by default and 'US' is not in the first
         page alphabetically — a single-request implementation reports that
         Printful does not ship to the United States.
+
+        The returned-equals-total cross-check now lives in
+        printful_core/tests/test_pagination.py::test_walks_every_page; the
+        summarized shape carries no paging block to compare against.
         """
-        data = shipping_mod.list_countries(backend)
-        summary = shipping_mod.summarize_countries(data)
+        summary = shipping_mod.list_countries(transport)
         codes = {c["code"] for c in summary["countries"]}
-        total = data.get("paging", {}).get("total")
-        assert summary["count"] == total, (
-            f"Returned {summary['count']} of {total} countries — pagination is "
-            "dropping rows."
-        )
         assert summary["count"] > 20, "Looks like only the first page was fetched"
         for expected in ("US", "GB", "DE", "CA"):
             assert expected in codes, f"{expected} missing from country list"
-        print(f"\n  Countries: {summary['count']} of {total}")
+        print(f"\n  Countries: {summary['count']}")
 
-    def test_countries_single_page_opt_out(self, backend):
-        """all_pages=False returns exactly one page, for callers that want it."""
-        data = shipping_mod.list_countries(backend, all_pages=False)
-        assert len(data.get("data", [])) <= shipping_mod.PAGE_LIMIT
-
-    def test_catalog_products_limit_respected(self, backend):
-        data = catalog_mod.list_products(backend, limit=3)
-        summary = catalog_mod.summarize_products(data)
+    def test_catalog_products_limit_respected(self, transport):
+        summary = catalog_mod.list_products(transport, limit=3)
         assert summary["count"] == 3
         for product in summary["products"]:
             assert isinstance(product["id"], int)
             assert product["name"]
         print(f"\n  Products: {[p['id'] for p in summary['products']]}")
 
-    def test_get_known_product(self, backend):
-        data = catalog_mod.get_product(backend, KNOWN_PRODUCT_ID)
+    def test_get_known_product(self, transport):
+        data = catalog_mod.get_product(transport, KNOWN_PRODUCT_ID)
         body = data.get("data", data)
         assert body["id"] == KNOWN_PRODUCT_ID
         assert body.get("name")
         print(f"\n  Product {KNOWN_PRODUCT_ID}: {body.get('name')}")
 
-    def test_variants_carry_size_and_color(self, backend):
-        data = catalog_mod.list_variants(backend, KNOWN_PRODUCT_ID, limit=5)
-        summary = catalog_mod.summarize_variants(data)
+    def test_variants_carry_size_and_color(self, transport):
+        summary = catalog_mod.list_variants(transport, KNOWN_PRODUCT_ID, limit=5)
         assert summary["count"] > 0
         assert any(v["size"] for v in summary["variants"])
         assert any(v["color"] for v in summary["variants"])
 
-    def test_variant_prices(self, backend, known_variant_id):
-        data = catalog_mod.get_variant_prices(backend, known_variant_id)
+    def test_variant_prices(self, transport, known_variant_id):
+        data = catalog_mod.get_variant_prices(transport, known_variant_id)
         body = data.get("data", data)
         assert body, f"No pricing returned for variant {known_variant_id}"
         print(f"\n  Variant {known_variant_id} pricing keys: {list(body)[:5]}")
 
-    def test_categories(self, backend):
-        data = catalog_mod.list_categories(backend, limit=5)
+    def test_categories(self, transport):
+        data = catalog_mod.list_categories(transport, limit=5)
         rows = data.get("data", []) or []
         assert rows
         assert all("id" in c for c in rows)
 
-    def test_size_guide(self, backend):
-        data = catalog_mod.get_size_guide(backend, KNOWN_PRODUCT_ID)
+    def test_size_guide(self, transport):
+        data = catalog_mod.get_size_guide(transport, KNOWN_PRODUCT_ID)
         body = data.get("data", data)
         assert body, "Expected size guide tables"
 
-    def test_availability(self, backend):
-        data = catalog_mod.get_availability(backend, KNOWN_PRODUCT_ID)
+    def test_availability(self, transport):
+        data = catalog_mod.get_availability(transport, KNOWN_PRODUCT_ID)
         assert data.get("data") is not None
 
-    def test_store_list(self, backend):
-        data = stores_mod.list_stores(backend)
-        summary = stores_mod.summarize_stores(data)
+    def test_store_list(self, transport):
+        summary = stores_mod.list_stores(transport)
         print(f"\n  Stores: {[(s['id'], s['name']) for s in summary['stores']]}")
         assert summary["count"] >= 0
 
-    def test_orders_list_succeeds(self, backend):
-        data = orders_mod.list_orders(backend, limit=3)
-        summary = orders_mod.summarize_orders(data)
+    def test_orders_list_succeeds(self, transport):
+        summary = orders_mod.list_orders(transport, limit=3)
         assert summary["count"] >= 0
 
-    def test_bad_product_id_errors_cleanly(self, backend):
+    def test_bad_product_id_errors_cleanly(self, transport):
         """A 404 must surface the API's real message, not a generic placeholder.
 
         Asserting only that a message exists is too weak: it passed while the
         error normalizer was silently reducing every v2 error to "Unknown error".
         """
         with pytest.raises(PrintfulError) as exc:
-            catalog_mod.get_product(backend, 99999999)
+            catalog_mod.get_product(transport, 99999999)
         assert exc.value.status_code in (400, 404)
         assert exc.value.message != "Unknown error"
         assert "99999999" in exc.value.message, (
@@ -212,7 +201,7 @@ class TestLiveReadOnly:
 
 @pytest.mark.live
 class TestLiveDraftOrder:
-    def test_shipping_rates_for_us_destination(self, backend, known_variant_id):
+    def test_shipping_rates_for_us_destination(self, transport, known_variant_id):
         recipient = {
             "name": "CLI Harness Test",
             "address1": "11025 Westlake Dr",
@@ -224,8 +213,7 @@ class TestLiveDraftOrder:
         # Rates can be quoted before artwork exists — no placements here,
         # deliberately, to prove that asymmetry against the live API.
         items = [_catalog_item(known_variant_id, with_design=False)]
-        data = shipping_mod.calculate_rates(backend, recipient, items)
-        summary = shipping_mod.summarize_rates(data)
+        summary = shipping_mod.calculate_rates(transport, recipient, items)
         assert summary["count"] > 0, "Expected at least one shipping rate"
         first = summary["rates"][0]
         # The live payload names these `shipping` / `shipping_method_name`;
@@ -235,24 +223,23 @@ class TestLiveDraftOrder:
         assert first["rate"], f"Rate has no price: {first}"
         print(f"\n  Rates: {[(r['name'], r['rate'], r['currency']) for r in summary['rates']]}")
 
-    def test_create_and_cancel_draft_order(self, backend, known_variant_id):
+    def test_create_and_cancel_draft_order(self, transport, known_variant_id):
         """Create a real DRAFT order, verify it, then clean it up.
 
         Drafts are not charged. The order is cancelled at the end so the suite
         leaves no residue in the user's account.
         """
-        payload = {
-            "recipient": {
-                "name": "CLI Harness Test",
-                "address1": "11025 Westlake Dr",
-                "city": "Charlotte",
-                "state_code": "NC",
-                "country_code": "US",
-                "zip": "28273",
-            },
-            "order_items": [_catalog_item(known_variant_id)],
+        recipient = {
+            "name": "CLI Harness Test",
+            "address1": "11025 Westlake Dr",
+            "city": "Charlotte",
+            "state_code": "NC",
+            "country_code": "US",
+            "zip": "28273",
         }
-        created = orders_mod.create_order(backend, payload)
+        created = orders_mod.create_order(
+            transport, recipient, [_catalog_item(known_variant_id)]
+        )
         body = created.get("data", created)
         order_id = body.get("id")
         assert order_id, f"No order ID in response: {body}"
@@ -263,33 +250,56 @@ class TestLiveDraftOrder:
         print(f"\n  Draft order created: {order_id}")
 
         try:
-            fetched = orders_mod.get_order(backend, str(order_id))
+            fetched = orders_mod.get_order(transport, str(order_id))
             assert fetched.get("data", fetched).get("id") == order_id
 
-            items = orders_mod.list_order_items(backend, str(order_id))
+            items = orders_mod.list_items(transport, str(order_id))
             assert items.get("data") is not None
         finally:
             # Cancelling a DRAFT is free and non-destructive.
-            orders_mod.cancel_order(backend, str(order_id))
+            orders_mod.cancel_order(transport, str(order_id))
             print(f"  Draft order {order_id} cancelled (cleanup)")
 
-    def test_estimate_costs(self, backend, known_variant_id):
-        payload = {
-            "recipient": {
-                "address1": "11025 Westlake Dr",
-                "city": "Charlotte",
-                "state_code": "NC",
-                "country_code": "US",
-                "zip": "28273",
-            },
-            "order_items": [_catalog_item(known_variant_id)],
-        }
-        data = orders_mod.estimate_costs(backend, payload, max_wait=45, interval=3)
+    ESTIMATE_RECIPIENT = {
+        "address1": "11025 Westlake Dr",
+        "city": "Charlotte",
+        "state_code": "NC",
+        "country_code": "US",
+        "zip": "28273",
+    }
+
+    def test_estimate_costs(self, transport, known_variant_id):
+        data = orders_mod.estimate_costs(
+            transport, self.ESTIMATE_RECIPIENT,
+            [_catalog_item(known_variant_id)], max_wait=45, interval=3,
+        )
         body = data.get("data", data)
         assert body.get("status") == "completed"
         assert body.get("costs"), "Completed estimate should carry costs"
         print(f"\n  Estimated total: {body['costs'].get('total')} "
               f"{body['costs'].get('currency')}")
+
+    def test_estimation_rejects_an_item_with_no_artwork(self, transport,
+                                                        known_variant_id):
+        """Where the artwork asymmetry ends: estimation sides with ordering.
+
+        Shipping rates quote an item with no `placements`; `POST /v2/orders`
+        rejects one. `POST /v2/order-estimation-tasks` was unestablished until
+        this test asked it live: it rejects, with the same message the order
+        endpoint gives, and it rejects on the initial POST rather than by
+        completing a task with a failure. Estimation is free and places no
+        order, so this costs nothing to assert.
+        """
+        with pytest.raises(PrintfulError) as exc:
+            orders_mod.estimate_costs(
+                transport, self.ESTIMATE_RECIPIENT,
+                [_catalog_item(known_variant_id, with_design=False)],
+                max_wait=45, interval=3,
+            )
+        assert "placements" in exc.value.message, (
+            f"Expected the API's own placements message, got {exc.value.message!r}"
+        )
+        print(f"\n  Estimate without artwork refused: {exc.value.message}")
 
 
 # --------------------------------------------------------------------------
@@ -305,30 +315,32 @@ class TestLiveDraftOrder:
 class TestLiveMockups:
     DESIGN_URL = "https://raw.githubusercontent.com/github/explore/main/topics/python/python.png"
 
-    def test_mockup_styles(self, backend):
+    def test_mockup_styles(self, transport):
         from printful_cli.core import mockups as mockups_mod
 
-        data = mockups_mod.list_styles(backend, KNOWN_PRODUCT_ID)
+        data = mockups_mod.list_styles(transport, KNOWN_PRODUCT_ID)
         assert data.get("data") is not None
 
-    def test_create_mockup_and_fetch_image(self, backend, known_variant_id):
+    def test_create_mockup_and_fetch_image(self, transport, known_variant_id):
         """Create a real mockup and verify the returned URL serves image bytes."""
-        import requests
+        # httpx, not requests: the CLI carries one HTTP stack, and it is the
+        # one printful_core uses. Redirects are not followed by default here.
+        import httpx
 
         from printful_cli.core import mockups as mockups_mod
 
         created = mockups_mod.create_task(
-            backend, KNOWN_PRODUCT_ID, [known_variant_id], self.DESIGN_URL
+            transport, KNOWN_PRODUCT_ID, [known_variant_id], self.DESIGN_URL
         )
         body = created.get("data", created)
         task_id = body.get("id")
         assert task_id
 
-        done = mockups_mod.wait_for_task(backend, task_id, max_wait=180, interval=5)
+        done = mockups_mod.wait_for_task(transport, task_id, max_wait=180, interval=5)
         urls = mockups_mod.extract_mockup_urls(done)
         assert urls, "Completed mockup task returned no URLs"
 
-        resp = requests.get(urls[0], timeout=60)
+        resp = httpx.get(urls[0], timeout=60, follow_redirects=True)
         assert resp.status_code == 200
         assert len(resp.content) > 1000, "Mockup image suspiciously small"
         # JPEG starts FF D8 FF; PNG starts \x89PNG
@@ -337,15 +349,16 @@ class TestLiveMockups:
         )
         print(f"\n  Mockup: {urls[0]} ({len(resp.content):,} bytes)")
 
-    def test_file_add_list_get_roundtrip(self, backend):
+    def test_file_add_list_get_roundtrip(self, transport):
         from printful_cli.core import files as files_mod
 
-        added = files_mod.add_file(backend, self.DESIGN_URL, filename="harness-test.png")
+        added = files_mod.add_file(transport, self.DESIGN_URL,
+                                   filename="harness-test.png")
         body = added.get("data", added)
         file_id = body.get("id")
         assert file_id
 
-        fetched = files_mod.get_file(backend, file_id)
+        fetched = files_mod.get_file(transport, file_id)
         assert fetched.get("data", fetched).get("id") == file_id
         print(f"\n  File {file_id} round-tripped")
 

@@ -15,7 +15,8 @@ The harness spec's Phase 1 steps assume an open-source GUI app; they do not appl
 literally here.
 
 **Recorded deviation #1 — HTTP backend instead of a subprocess backend.**
-`utils/printful_backend.py` is the backend module required by Phase 3, but it wraps
+`printful_core` (`transport.py` plus the `endpoints/` request builders) is the
+backend module required by Phase 3, but it wraps
 HTTPS calls to `api.printful.com` rather than a local binary. This follows the
 existing precedent in this marketplace: `cli-anything-novita` and `cli-anything-exa`
 are both API-service harnesses with the same shape.
@@ -127,14 +128,15 @@ Rules:
 
 ### State model
 
-Session file: `~/.cli-anything-printful/session.json`, overridable with `--session`.
+Session file: `~/.config/printful/session.json`, overridable with `--session`.
+A file left at the old `~/.cli-anything-printful/session.json` is no longer read.
 Written through `_locked_save_json` (exclusive `fcntl` lock, per
 `guides/session-locking.md`).
 
 Auto-save fires via `@cli.result_callback()` after one-shot mutations, skipped in REPL
 mode and under `--dry-run`.
 
-Config file: `~/.config/cli-anything-printful/config.json`.
+Config file: `~/.config/printful/config.json`, beside the session file.
 Credential precedence: `--api-key` flag → `PRINTFUL_API_KEY` env → config file.
 Same for store ID (`--store-id` → `PRINTFUL_STORE_ID` → config).
 

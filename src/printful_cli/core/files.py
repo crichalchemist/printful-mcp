@@ -1,4 +1,4 @@
-"""File library operations (v2).
+"""File library operations for the CLI.
 
 Printful exposes only "add a file" and "get a file by ID" — there is no list-files
 endpoint in either API version. `list_added` reads the session's local record
@@ -8,25 +8,17 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from ..utils.printful_backend import PrintfulBackend
+from printful_core.endpoints import files as endpoints
+from printful_core.transport import SyncTransport
 
 
-def add_file(
-    backend: PrintfulBackend,
-    url: str,
-    filename: Optional[str] = None,
-    visible: bool = True,
-) -> Dict[str, Any]:
-    if not url:
-        raise ValueError("A file URL is required.")
-    payload: Dict[str, Any] = {"url": url, "visible": visible}
-    if filename:
-        payload["filename"] = filename
-    return backend.post("/files", json_data=payload)
+def add_file(transport: SyncTransport, url: str, filename: Optional[str] = None,
+             visible: bool = True) -> Dict[str, Any]:
+    return transport.send(endpoints.add_file(url, filename, visible))
 
 
-def get_file(backend: PrintfulBackend, file_id: int) -> Dict[str, Any]:
-    return backend.get(f"/files/{file_id}")
+def get_file(transport: SyncTransport, file_id: int) -> Dict[str, Any]:
+    return transport.send(endpoints.get_file(file_id))
 
 
 def list_added(session_files: List[Dict[str, Any]]) -> Dict[str, Any]:

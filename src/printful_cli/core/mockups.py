@@ -1,78 +1,49 @@
-"""Mockup generator operations (v2).
+"""Mockup generator operations for the CLI.
 
 Mockup generation is the most tightly rate-limited part of the Printful API:
 10 requests/60s for established stores, 2 requests/60s for NEW stores, with a
 60-second lockout when exceeded, plus a 20,000 generated-files-per-24h account cap.
-The backend surfaces 429 rather than retrying, so callers see the limit instead of
-being walked into a lockout.
+The transport surfaces 429 rather than retrying, so callers see the limit instead
+of being walked into a lockout.
 """
 from __future__ import annotations
 
 import time
 from typing import Any, Dict, List, Optional
 
-from ..utils.printful_backend import PrintfulBackend, PrintfulError
+from printful_core.endpoints import mockups as endpoints
+from printful_core.errors import PrintfulError
+from printful_core.format import summary
+from printful_core.transport import SyncTransport
 
-RATE_LIMIT_NOTE = (
-    "Mockup creation is rate limited to 10 requests/60s (established stores) or "
-    "2 requests/60s (new stores), with a 60s lockout when exceeded."
-)
+# Re-exported so the command layer keeps one name for one implementation.
+RATE_LIMIT_NOTE = endpoints.RATE_LIMIT_NOTE
+extract_mockup_urls = summary.mockup_urls
 
 
-def create_task(
-    backend: PrintfulBackend,
-    product_id: int,
-    variant_ids: List[int],
-    image_url: str,
-    placement: str = "front",
-    technique: str = "dtg",
-    mockup_style_ids: Optional[List[int]] = None,
-    image_format: str = "jpg",
-) -> Dict[str, Any]:
+def create_task(transport: SyncTransport, product_id: int,
+                variant_ids: List[int], image_url: str,
+                placement: str = "front", technique: str = "dtg",
+                mockup_style_ids: Optional[List[int]] = None,
+                image_format: str = "jpg") -> Dict[str, Any]:
     """Create an async mockup generation task."""
-    if not variant_ids:
-        raise ValueError("At least one catalog variant ID is required.")
-    if not image_url:
-        raise ValueError("A design image URL is required.")
-
-    payload: Dict[str, Any] = {
-        "format": image_format,
-        "products": [
-            {
-                "source": "catalog",
-                "catalog_product_id": int(product_id),
-                "catalog_variant_ids": [int(v) for v in variant_ids],
-                "orientation": "any",
-                "placements": [
-                    {
-                        "placement": placement,
-                        "technique": technique,
-                        "layers": [{"type": "file", "url": image_url}],
-                    }
-                ],
-            }
-        ],
-    }
-    if mockup_style_ids:
-        payload["products"][0]["mockup_style_ids"] = [int(s) for s in mockup_style_ids]
-    return backend.post("/mockup-tasks", json_data=payload)
+    return transport.send(endpoints.create_task(
+        product_id, variant_ids, image_url, placement, technique,
+        mockup_style_ids, image_format))
 
 
-def get_task(backend: PrintfulBackend, task_id: str) -> Dict[str, Any]:
-    return backend.get("/mockup-tasks", params={"id": task_id})
+def get_task(transport: SyncTransport, task_id: str) -> Dict[str, Any]:
+    return transport.send(endpoints.get_task(task_id))
 
 
-def wait_for_task(
-    backend: PrintfulBackend,
-    task_id: str,
-    max_wait: float = 120.0,
-    interval: float = 5.0,
-) -> Dict[str, Any]:
+def wait_for_task(transport: SyncTransport, task_id: str,
+                  max_wait: float = 120.0,
+                  interval: float = 5.0) -> Dict[str, Any]:
     """Poll a mockup task until it completes or fails."""
     deadline = time.monotonic() + max_wait
     latest: Dict[str, Any] = {}
     while time.monotonic() < deadline:
-        latest = get_task(backend, task_id)
+        latest = transport.send(endpoints.get_task(task_id))
         body = latest.get("data", latest)
         if isinstance(body, list):
             body = body[0] if body else {}
@@ -92,29 +63,14 @@ def wait_for_task(
     )
 
 
-def list_styles(backend: PrintfulBackend, product_id: int) -> Dict[str, Any]:
-    return backend.get(f"/catalog-products/{product_id}/mockup-styles")
+def list_styles(transport: SyncTransport, product_id: int) -> Dict[str, Any]:
+    return transport.send(endpoints.list_styles(product_id))
 
 
-def list_templates(backend: PrintfulBackend, product_id: int) -> Dict[str, Any]:
-    return backend.get(f"/catalog-products/{product_id}/mockup-templates")
+def list_templates(transport: SyncTransport, product_id: int) -> Dict[str, Any]:
+    """Mockup templates for one product — note the required product_id.
 
-
-def extract_mockup_urls(data: Dict[str, Any]) -> List[str]:
-    """Pull every mockup image URL out of a completed task response."""
-    body = data.get("data", data)
-    if isinstance(body, dict):
-        body = [body]
-    urls: List[str] = []
-    for task in body or []:
-        if not isinstance(task, dict):
-            continue
-        for item in task.get("mockups", []) or []:
-            url = item.get("mockup_url") or item.get("url")
-            if url:
-                urls.append(url)
-            for extra in item.get("extra", []) or []:
-                extra_url = extra.get("url")
-                if extra_url:
-                    urls.append(extra_url)
-    return urls
+    printful_core.endpoints.stores.list_templates shares this name but takes
+    (limit, offset), so passing a product ID there binds it silently to limit.
+    """
+    return transport.send(endpoints.list_templates(product_id))

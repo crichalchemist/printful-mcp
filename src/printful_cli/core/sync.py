@@ -3,19 +3,19 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from ..utils.printful_backend import PrintfulBackend
+from printful_core.endpoints import sync as endpoints
+from printful_core.transport import SyncTransport
 
 
-def list_sync_products(
-    backend: PrintfulBackend, limit: int = 20, offset: int = 0
-) -> Dict[str, Any]:
-    result = backend.get(
-        "/store/products", version="v1", params={"limit": limit, "offset": offset}
-    )
+def list_sync_products(transport: SyncTransport, limit: int = 20,
+                       offset: int = 0) -> Dict[str, Any]:
+    # v1 unwraps to a bare list, so there is no summary.* helper for this shape.
+    result = transport.send(endpoints.list_products(limit, offset))
     items = result if isinstance(result, list) else result.get("items", [])
     return {"sync_products": items, "count": len(items)}
 
 
-def get_sync_product(backend: PrintfulBackend, sync_product_id: int) -> Dict[str, Any]:
-    result = backend.get(f"/store/products/{sync_product_id}", version="v1")
+def get_sync_product(transport: SyncTransport,
+                     sync_product_id: int) -> Dict[str, Any]:
+    result = transport.send(endpoints.get_product(sync_product_id))
     return result if isinstance(result, dict) else {"result": result}

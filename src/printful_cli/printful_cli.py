@@ -22,20 +22,16 @@ from .core import session as session_mod
 from .core import shipping as shipping_mod
 from .core import stores as stores_mod
 from .core import sync as sync_mod
-from .utils.printful_backend import (
-    PrintfulAuthError,
-    PrintfulBackend,
-    PrintfulError,
-    PrintfulRateLimitError,
-    load_config,
-    save_config,
-    CONFIG_FILE,
-)
 from .ui import UI
+from printful_core.auth import CONFIG_FILE, Credentials, load_config, save_config
+from printful_core.errors import (
+    PrintfulAuthError, PrintfulError, PrintfulRateLimitError,
+)
+from printful_core.transport import SyncTransport
 
 _repl_mode = False
 _session: Optional[session_mod.PrintfulSession] = None
-_backend: Optional[PrintfulBackend] = None
+_transport: Optional[SyncTransport] = None
 _ui: Optional[UI] = None
 
 
@@ -57,15 +53,16 @@ def get_session(session_file: Optional[str] = None) -> session_mod.PrintfulSessi
     return _session
 
 
-def get_backend(ctx) -> PrintfulBackend:
-    """Build the API client lazily so --help and config commands need no token."""
-    global _backend
-    if _backend is None:
-        _backend = PrintfulBackend(
+def get_transport(ctx) -> SyncTransport:
+    """Build the transport lazily so --help and config need no token."""
+    global _transport
+    if _transport is None:
+        credentials = Credentials.resolve(
             api_key=ctx.obj.get("api_key"),
             store_id=ctx.obj.get("store_id") or get_session().store_id,
         )
-    return _backend
+        _transport = SyncTransport(credentials)
+    return _transport
 
 
 def output(ctx, data: Any, message: str = "", table: Optional[Dict[str, Any]] = None) -> None:
@@ -269,10 +266,9 @@ def catalog():
 @handle_error
 def catalog_products(ctx, limit, offset, category_ids, colors, techniques, types):
     """List catalog products."""
-    data = catalog_mod.list_products(
-        get_backend(ctx), limit, offset, category_ids, colors, techniques, types
+    summary = catalog_mod.list_products(
+        get_transport(ctx), limit, offset, category_ids, colors, techniques, types
     )
-    summary = catalog_mod.summarize_products(data)
     output(
         ctx,
         summary,
@@ -292,7 +288,7 @@ def catalog_products(ctx, limit, offset, category_ids, colors, techniques, types
 @handle_error
 def catalog_product(ctx, product_id):
     """Get details for one catalog product."""
-    data = catalog_mod.get_product(get_backend(ctx), product_id)
+    data = catalog_mod.get_product(get_transport(ctx), product_id)
     output(ctx, data.get("data", data))
 
 
@@ -304,8 +300,7 @@ def catalog_product(ctx, product_id):
 @handle_error
 def catalog_variants(ctx, product_id, limit, offset):
     """List variants (size/color combinations) for a product."""
-    data = catalog_mod.list_variants(get_backend(ctx), product_id, limit, offset)
-    summary = catalog_mod.summarize_variants(data)
+    summary = catalog_mod.list_variants(get_transport(ctx), product_id, limit, offset)
     output(
         ctx,
         summary,
@@ -326,7 +321,7 @@ def catalog_variants(ctx, product_id, limit, offset):
 @handle_error
 def catalog_variant_price(ctx, variant_id, currency):
     """Get pricing for a catalog variant."""
-    data = catalog_mod.get_variant_prices(get_backend(ctx), variant_id, currency)
+    data = catalog_mod.get_variant_prices(get_transport(ctx), variant_id, currency)
     output(ctx, data.get("data", data))
 
 
@@ -337,7 +332,7 @@ def catalog_variant_price(ctx, variant_id, currency):
 @handle_error
 def catalog_availability(ctx, product_id, techniques):
     """Get stock availability for a product."""
-    data = catalog_mod.get_availability(get_backend(ctx), product_id, techniques)
+    data = catalog_mod.get_availability(get_transport(ctx), product_id, techniques)
     output(ctx, data.get("data", data))
 
 
@@ -348,7 +343,7 @@ def catalog_availability(ctx, product_id, techniques):
 @handle_error
 def catalog_categories(ctx, limit, offset):
     """List catalog categories."""
-    data = catalog_mod.list_categories(get_backend(ctx), limit, offset)
+    data = catalog_mod.list_categories(get_transport(ctx), limit, offset)
     rows = data.get("data", []) or []
     output(
         ctx,
@@ -369,7 +364,7 @@ def catalog_categories(ctx, limit, offset):
 @handle_error
 def catalog_category(ctx, category_id):
     """Get one catalog category."""
-    data = catalog_mod.get_category(get_backend(ctx), category_id)
+    data = catalog_mod.get_category(get_transport(ctx), category_id)
     output(ctx, data.get("data", data))
 
 
@@ -380,7 +375,7 @@ def catalog_category(ctx, category_id):
 @handle_error
 def catalog_size_guide(ctx, product_id, unit):
     """Get the size guide for a product."""
-    data = catalog_mod.get_size_guide(get_backend(ctx), product_id, unit)
+    data = catalog_mod.get_size_guide(get_transport(ctx), product_id, unit)
     output(ctx, data.get("data", data))
 
 
@@ -401,8 +396,7 @@ def orders():
 @handle_error
 def orders_list(ctx, limit, offset, status):
     """List orders."""
-    data = orders_mod.list_orders(get_backend(ctx), limit, offset, status)
-    summary = orders_mod.summarize_orders(data)
+    summary = orders_mod.list_orders(get_transport(ctx), limit, offset, status)
     output(
         ctx,
         summary,
@@ -423,7 +417,7 @@ def orders_list(ctx, limit, offset, status):
 @handle_error
 def orders_get(ctx, order_id):
     """Get one order. Prefix an external ID with @."""
-    data = orders_mod.get_order(get_backend(ctx), order_id)
+    data = orders_mod.get_order(get_transport(ctx), order_id)
     output(ctx, data.get("data", data))
 
 
@@ -473,7 +467,10 @@ def orders_create(ctx, items_json, name, address1, city, state_code, country_cod
                message="Dry run — no order created.")
         return
 
-    data = orders_mod.create_order(get_backend(ctx), payload)
+    data = orders_mod.create_order(
+        get_transport(ctx), payload["recipient"], payload["order_items"],
+        payload.get("external_id"),
+    )
     body = data.get("data", data)
     sess.save_history(f"orders create -> {body.get('id')}", {"id": body.get("id")})
     output(ctx, body,
@@ -496,7 +493,7 @@ def orders_update(ctx, order_id, shipping, external_id):
         output(ctx, {"dry_run": True, "would_patch": f"/v2/orders/{order_id}",
                      "payload": payload}, message="Dry run — no change made.")
         return
-    data = orders_mod.update_order(get_backend(ctx), order_id, payload)
+    data = orders_mod.update_order(get_transport(ctx), order_id, payload)
     output(ctx, data.get("data", data), message=f"Order {order_id} updated.")
 
 
@@ -514,7 +511,7 @@ def orders_cancel(ctx, order_id, yes):
         output(ctx, {"dry_run": True, "would_delete": f"/v2/orders/{order_id}"},
                message="Dry run — nothing cancelled.")
         return
-    data = orders_mod.cancel_order(get_backend(ctx), order_id)
+    data = orders_mod.cancel_order(get_transport(ctx), order_id)
     get_session().save_history(f"orders cancel {order_id}", {"order_id": order_id})
     output(ctx, data, message=f"Order {order_id} cancelled.")
 
@@ -537,7 +534,7 @@ def orders_confirm(ctx, order_id, yes):
                      "would_post": f"/v2/orders/{order_id}/confirmation"},
                message="Dry run — order NOT confirmed, nothing charged.")
         return
-    data = orders_mod.confirm_order(get_backend(ctx), order_id)
+    data = orders_mod.confirm_order(get_transport(ctx), order_id)
     get_session().save_history(f"orders confirm {order_id}", {"order_id": order_id})
     output(ctx, data.get("data", data),
            message=f"Order {order_id} confirmed and submitted for fulfillment.")
@@ -567,7 +564,7 @@ def orders_estimate(ctx, items_json, no_poll, max_wait):
                      "payload": payload}, message="Dry run — no estimate requested.")
         return
     data = orders_mod.estimate_costs(
-        get_backend(ctx), payload, poll=not no_poll, max_wait=max_wait
+        get_transport(ctx), recipient, items, poll=not no_poll, max_wait=max_wait
     )
     output(ctx, data.get("data", data))
 
@@ -578,7 +575,7 @@ def orders_estimate(ctx, items_json, no_poll, max_wait):
 @handle_error
 def orders_items(ctx, order_id):
     """List the items on an order."""
-    data = orders_mod.list_order_items(get_backend(ctx), order_id)
+    data = orders_mod.list_items(get_transport(ctx), order_id)
     output(ctx, data.get("data", data))
 
 
@@ -588,7 +585,7 @@ def orders_items(ctx, order_id):
 @handle_error
 def orders_shipments(ctx, order_id):
     """List shipments for an order."""
-    data = orders_mod.list_shipments(get_backend(ctx), order_id)
+    data = orders_mod.list_shipments(get_transport(ctx), order_id)
     output(ctx, data.get("data", data))
 
 
@@ -624,8 +621,9 @@ def ship_rates(ctx, items_json, country_code, state_code, city, zip_code, curren
     if not recipient.get("country_code"):
         raise ValueError("A recipient country is required (--country-code).")
     items = _load_items_json(items_json)
-    data = shipping_mod.calculate_rates(get_backend(ctx), recipient, items, currency)
-    summary = shipping_mod.summarize_rates(data)
+    summary = shipping_mod.calculate_rates(
+        get_transport(ctx), recipient, items, currency
+    )
     output(
         ctx,
         summary,
@@ -646,8 +644,7 @@ def ship_rates(ctx, items_json, country_code, state_code, city, zip_code, curren
 @handle_error
 def ship_countries(ctx):
     """List countries Printful ships to."""
-    data = shipping_mod.list_countries(get_backend(ctx))
-    summary = shipping_mod.summarize_countries(data)
+    summary = shipping_mod.list_countries(get_transport(ctx))
     if ctx.obj.get("json"):
         output(ctx, summary)
         return
@@ -668,7 +665,7 @@ def ship_countries(ctx):
 def ship_tax(ctx, country_code, state_code, city, zip_code):
     """Calculate a tax rate (v1 — no v2 equivalent exists)."""
     data = shipping_mod.calculate_tax(
-        get_backend(ctx), country_code, state_code, city, zip_code
+        get_transport(ctx), country_code, state_code, city, zip_code
     )
     output(ctx, data)
 
@@ -704,15 +701,15 @@ def mockup_create(ctx, product_id, variant_ids, image_url, placement, technique,
                      "product_id": product_id, "variant_ids": variants},
                message="Dry run — no mockup task created.")
         return
-    backend = get_backend(ctx)
+    transport = get_transport(ctx)
     data = mockups_mod.create_task(
-        backend, product_id, variants, image_url, placement, technique,
+        transport, product_id, variants, image_url, placement, technique,
         styles or None, image_format,
     )
     body = data.get("data", data)
     task_id = body.get("id") if isinstance(body, dict) else None
     if wait and task_id:
-        data = mockups_mod.wait_for_task(backend, task_id)
+        data = mockups_mod.wait_for_task(transport, task_id)
         body = data.get("data", data)
     urls = mockups_mod.extract_mockup_urls(data)
     result = {"task": body, "mockup_urls": urls}
@@ -727,9 +724,9 @@ def mockup_create(ctx, product_id, variant_ids, image_url, placement, technique,
 @handle_error
 def mockup_status(ctx, task_id, wait):
     """Check a mockup generation task."""
-    backend = get_backend(ctx)
-    data = (mockups_mod.wait_for_task(backend, task_id) if wait
-            else mockups_mod.get_task(backend, task_id))
+    transport = get_transport(ctx)
+    data = (mockups_mod.wait_for_task(transport, task_id) if wait
+            else mockups_mod.get_task(transport, task_id))
     output(ctx, {"task": data.get("data", data),
                  "mockup_urls": mockups_mod.extract_mockup_urls(data)})
 
@@ -740,7 +737,7 @@ def mockup_status(ctx, task_id, wait):
 @handle_error
 def mockup_styles(ctx, product_id):
     """List mockup styles available for a product."""
-    data = mockups_mod.list_styles(get_backend(ctx), product_id)
+    data = mockups_mod.list_styles(get_transport(ctx), product_id)
     output(ctx, data.get("data", data))
 
 
@@ -750,7 +747,7 @@ def mockup_styles(ctx, product_id):
 @handle_error
 def mockup_templates(ctx, product_id):
     """List mockup templates (positional data) for a product."""
-    data = mockups_mod.list_templates(get_backend(ctx), product_id)
+    data = mockups_mod.list_templates(get_transport(ctx), product_id)
     output(ctx, data.get("data", data))
 
 
@@ -776,7 +773,7 @@ def files_add(ctx, url, filename, hidden):
         output(ctx, {"dry_run": True, "would_post": "/v2/files", "url": url},
                message="Dry run — no file added.")
         return
-    data = files_mod.add_file(get_backend(ctx), url, filename, visible=not hidden)
+    data = files_mod.add_file(get_transport(ctx), url, filename, visible=not hidden)
     body = data.get("data", data)
     sess = get_session()
     sess.record_file(body.get("id"), url, filename or "")
@@ -789,7 +786,7 @@ def files_add(ctx, url, filename, hidden):
 @handle_error
 def files_get(ctx, file_id):
     """Get file details by ID."""
-    data = files_mod.get_file(get_backend(ctx), file_id)
+    data = files_mod.get_file(get_transport(ctx), file_id)
     output(ctx, data.get("data", data))
 
 
@@ -820,8 +817,7 @@ def store():
 @handle_error
 def store_list(ctx):
     """List stores available to the token."""
-    data = stores_mod.list_stores(get_backend(ctx))
-    summary = stores_mod.summarize_stores(data)
+    summary = stores_mod.list_stores(get_transport(ctx))
     output(ctx, summary, table={
         "headers": ["ID", "Name", "Type"],
         "rows": [[str(s["id"]), str(s["name"]), str(s["type"])]
@@ -840,7 +836,7 @@ def store_list(ctx):
 def store_stats(ctx, target_store, date_from, date_to, report_types, currency):
     """Get store statistics. Range cannot exceed 6 months."""
     data = stores_mod.get_statistics(
-        get_backend(ctx), target_store, date_from, date_to, report_types, currency
+        get_transport(ctx), target_store, date_from, date_to, report_types, currency
     )
     output(ctx, data.get("data", data))
 
@@ -852,7 +848,7 @@ def store_stats(ctx, target_store, date_from, date_to, report_types, currency):
 @handle_error
 def store_templates(ctx, limit, offset):
     """List product templates (v1 — no v2 equivalent)."""
-    data = stores_mod.list_templates(get_backend(ctx), limit, offset)
+    data = stores_mod.list_templates(get_transport(ctx), limit, offset)
     output(ctx, data)
 
 
@@ -871,8 +867,7 @@ def store_use(ctx, store_id, save):
     sess = get_session()
 
     if store_id is None:
-        stores_data = stores_mod.list_stores(get_backend(ctx))
-        rows = stores_mod.summarize_stores(stores_data)["stores"]
+        rows = stores_mod.list_stores(get_transport(ctx))["stores"]
         if not rows:
             raise ValueError("This token cannot reach any stores.")
 
@@ -931,7 +926,7 @@ def sync():
 @handle_error
 def sync_products(ctx, limit, offset):
     """List sync products."""
-    data = sync_mod.list_sync_products(get_backend(ctx), limit, offset)
+    data = sync_mod.list_sync_products(get_transport(ctx), limit, offset)
     output(ctx, data)
 
 
@@ -941,7 +936,7 @@ def sync_products(ctx, limit, offset):
 @handle_error
 def sync_get(ctx, sync_product_id):
     """Get one sync product."""
-    data = sync_mod.get_sync_product(get_backend(ctx), sync_product_id)
+    data = sync_mod.get_sync_product(get_transport(ctx), sync_product_id)
     output(ctx, data)
 
 
@@ -1163,13 +1158,12 @@ def config_path(ctx):
 @handle_error
 def test_connection(ctx):
     """Verify credentials against the live API."""
-    backend = get_backend(ctx)
-    data = shipping_mod.list_countries(backend)
-    count = len(data.get("data", []) or [])
+    transport = get_transport(ctx)
+    count = shipping_mod.list_countries(transport)["count"]
     result = {
         "ok": True,
         "countries_returned": count,
-        "store_id": backend.store_id,
+        "store_id": transport.credentials.store_id,
         "api_base": "https://api.printful.com/v2",
     }
     output(ctx, result, message=f"Connected. {count} shipping countries available.")

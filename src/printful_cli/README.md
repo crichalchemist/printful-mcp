@@ -49,7 +49,7 @@ config file.
 # Option 1: environment
 export PRINTFUL_API_KEY=your-token
 
-# Option 2: stored config (written 0600 to ~/.config/cli-anything-printful/config.json)
+# Option 2: stored config (written 0600 to ~/.config/printful/config.json)
 printful config set api_key your-token
 
 # Account-level tokens only: set the store context (sends X-PF-Store-Id)
@@ -190,8 +190,10 @@ The backend normalizes the two versions' different success and error envelopes.
 
 ## Session state
 
-State lives in `~/.cli-anything-printful/session.json` (override with `--session`)
+State lives in `~/.config/printful/session.json` (override with `--session`)
 and holds the draft order, the active store, file records, and command history.
+A session file left at the old `~/.cli-anything-printful/session.json` is no
+longer read; move it across by hand if you want to keep it.
 One-shot mutations auto-save; `--dry-run` suppresses that. Writes use an exclusive
 file lock.
 

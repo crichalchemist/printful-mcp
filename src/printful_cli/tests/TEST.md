@@ -36,8 +36,9 @@ here rather than discovered later.
 
 ## Unit Test Plan (`test_core.py`)
 
-No network. A `FakeResponse`/`FakeSession` pair is injected into `PrintfulBackend`
-so request construction and response normalization can be asserted exactly.
+No network. A `FakeTransport` records the `printful_core.request.Request` objects
+each CLI module builds and replays queued response bodies, so what the CLI asks
+for can be asserted exactly.
 
 ### `core/session.py` — `DraftOrder`
 - `set_recipient` stores known fields; rejects unknown fields loudly (`ValueError`).
@@ -58,49 +59,42 @@ so request construction and response normalization can be asserted exactly.
 - `save_history` appends and truncates at `MAX_HISTORY` (50).
 - `clear` empties draft, files, and history.
 - Corrupt session JSON loads as an empty session rather than crashing.
-- `_locked_save_json` creates parent directories.
+- `_locked_save_json` creates parent directories and chmods 0600.
+- `DEFAULT_SESSION_FILE` sits beside the config file, in `~/.config/printful`.
 
-### `utils/printful_backend.py`
-- Credential precedence: explicit argument beats env var beats config file.
-- Missing credentials raise `PrintfulAuthError` with setup instructions.
-- `X-PF-Store-Id` is sent when a store ID is set and omitted when it is not.
-- `Authorization: Bearer` is always sent.
-- v2 success returns the body unchanged.
-- v1 success unwraps `{"code", "result"}` down to `result`.
-- v2 error uses RFC 9457 `detail`, falling back to `title`.
-- v1 error uses `error.message`.
-- 401 raises `PrintfulAuthError` mentioning token expiry.
-- 403 raises `PrintfulAuthError` mentioning scopes.
-- 429 and 419 raise `PrintfulRateLimitError` carrying `Retry-After`.
-- 204 / empty body returns `{}` rather than raising.
-- `None`-valued query params are dropped before the request is sent.
-- Timeouts raise `PrintfulError` naming the URL.
+### The HTTP layer — now `printful_core`
+Credential precedence, `Authorization` and `X-PF-Store-Id` headers, v1/v2 success
+and error envelopes, 401/403/429/419 handling, 204 bodies, dropped `None` params
+and timeouts are the core's, and are tested in `src/printful_core/tests/`
+(`test_auth.py`, `test_transport.py`, `test_errors.py`, `test_request.py`). The
+CLI no longer carries an HTTP stack, so it no longer tests one.
 
 ### `core/orders.py`
-- `update_order` rejects an empty payload.
 - `confirm_order` POSTs to `/orders/{id}/confirmation` (asserted against the
-  mocked transport — the real endpoint is never called).
-- `cancel_order` DELETEs `/orders/{id}` and synthesizes a result on 204.
+  fake transport — the real endpoint is never called).
+- `cancel_order` DELETEs `/orders/{id}` and synthesizes a result on an empty body.
+- `create_order` folds the separately-held recipient and items into one body.
 - `estimate_costs` polls until `completed`; raises on `failed` including the
   failure reasons; raises on timeout naming the task ID.
-- `summarize_orders` flattens nested costs safely when `costs` is absent.
+- `list_orders` returns rows already summarized for the command layer.
 
 ### `core/mockups.py`
 - `create_task` rejects empty variant lists and missing image URLs.
-- `create_task` builds the nested `products[].placements[].layers[]` payload.
 - `wait_for_task` raises on `failed` and on timeout.
-- `extract_mockup_urls` pulls both primary and `extra` URLs, and returns `[]` for
-  an empty or malformed body.
+- `list_templates` asks for one product, not a page — the identically named
+  builder in `printful_core.endpoints.stores` takes `(limit, offset)` instead.
 
-### `core/catalog.py`, `core/shipping.py`, `core/files.py`
-- `summarize_products` / `summarize_variants` / `summarize_rates` /
-  `summarize_countries` handle empty and partial payloads without `KeyError`.
-- `calculate_rates` rejects an empty item list.
+### `core/catalog.py`, `core/shipping.py`, `core/stores.py`, `core/files.py`
+- Listing operations summarize before returning: `list_products`,
+  `list_variants`, `list_orders`, `calculate_rates` and `list_stores` hand the
+  command layer rows and a count, never a raw envelope.
+- `list_countries` walks every page through `printful_core.pagination`; a single
+  request omits the US.
 - `calculate_tax` targets v1 with a nested `recipient`.
 - `files.list_added` labels itself `session-local` and carries the explanatory note.
 
 ### CLI-level guards (via `CliRunner`, no network)
-- `orders confirm` without `--yes` exits non-zero and does not construct a backend.
+- `orders confirm` without `--yes` exits non-zero and does not construct a transport.
 - `orders cancel` without `--yes` exits non-zero.
 - `--dry-run orders confirm --yes` reports the would-be request and makes no call.
 - `--json` emits parseable JSON on both success and error paths.
@@ -130,6 +124,10 @@ Requires a real `PRINTFUL_API_KEY`. These call the live API.
   suite leaves no residue — cancellation of a *draft* is free and non-destructive
   to anything the user cares about, unlike cancelling a confirmed order.
 - `orders estimate` against the draft returns costs.
+- `orders estimate` *refuses* an item with no artwork, with the same
+  "Property `placements` is required" message the order endpoint gives. This is
+  where the placements asymmetry ends: only shipping rates quote an item with
+  no design.
 - `ship rates` returns at least one rate for a US destination.
 
 **Never called against the live API:**

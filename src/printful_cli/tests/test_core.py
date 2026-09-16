@@ -1,34 +1,38 @@
 """Unit tests for printful_cli.
 
-Synthetic data and a mocked transport only — no network, no API key. The billable
-endpoints (orders confirm) are asserted here against the fake transport precisely
-because they must never be exercised live.
+Synthetic data and a fake transport only — no network, no API key. The billable
+endpoint (orders confirm) is asserted here against the fake transport precisely
+because it must never be exercised live.
+
+The HTTP layer, the request builders, the error envelopes, pagination and the
+formatters now live in printful_core and are tested in src/printful_core/tests.
+What is left here is what the CLI itself owns: session state, polling loops,
+result shaping for the command layer, and the --yes guards.
 """
 from __future__ import annotations
 
 import json
 import os
-import tempfile
+import stat
+from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
 
+from printful_core import auth as auth_mod
+from printful_core.auth import CONFIG_FILE as CORE_CONFIG_FILE
+from printful_core.errors import PrintfulError
 from printful_cli.core import catalog as catalog_mod
 from printful_cli.core import files as files_mod
 from printful_cli.core import mockups as mockups_mod
 from printful_cli.core import orders as orders_mod
 from printful_cli.core import shipping as shipping_mod
+from printful_cli.core import stores as stores_mod
 from printful_cli.core.session import (
+    DEFAULT_SESSION_FILE,
     DraftOrder,
     PrintfulSession,
     _locked_save_json,
-)
-from printful_cli.utils import printful_backend as backend_mod
-from printful_cli.utils.printful_backend import (
-    PrintfulAuthError,
-    PrintfulBackend,
-    PrintfulError,
-    PrintfulRateLimitError,
 )
 
 
@@ -36,41 +40,25 @@ from printful_cli.utils.printful_backend import (
 # Fake transport
 # --------------------------------------------------------------------------
 
-class FakeResponse:
-    def __init__(self, status_code=200, body=None, headers=None, raw=None):
-        self.status_code = status_code
-        self._body = body if body is not None else {}
-        self.headers = headers or {}
-        self._raw = raw
-        self.content = b"" if raw == b"" else b"x"
+class FakeTransport:
+    """Records the Requests it is handed and replays queued response bodies.
 
-    def json(self):
-        if self._raw is not None:
-            raise ValueError("not json")
-        return self._body
-
-
-class FakeSession:
-    """Records requests and replays queued responses."""
+    A queued Exception is raised instead of returned, which is how the core's
+    transport reports an API error to these modules.
+    """
 
     def __init__(self, responses=None):
         self.responses = list(responses or [])
-        self.calls = []
+        self.requests = []
 
-    def request(self, **kwargs):
-        self.calls.append(kwargs)
+    def send(self, request, extra_headers=None):
+        self.requests.append(request)
         if not self.responses:
-            return FakeResponse(200, {"data": {}})
-        return self.responses.pop(0)
-
-    def close(self):
-        pass
-
-
-def make_backend(responses=None, api_key="test-token", store_id=None) -> PrintfulBackend:
-    backend = PrintfulBackend(api_key=api_key, store_id=store_id)
-    backend.session = FakeSession(responses)
-    return backend
+            return {"data": {}}
+        body = self.responses.pop(0)
+        if isinstance(body, Exception):
+            raise body
+        return body
 
 
 @pytest.fixture(autouse=True)
@@ -78,8 +66,8 @@ def isolate_env(monkeypatch, tmp_path):
     """Keep tests off the developer's real env vars and config file."""
     monkeypatch.delenv("PRINTFUL_API_KEY", raising=False)
     monkeypatch.delenv("PRINTFUL_STORE_ID", raising=False)
-    monkeypatch.setattr(backend_mod, "CONFIG_FILE", tmp_path / "config.json")
-    monkeypatch.setattr(backend_mod, "CONFIG_DIR", tmp_path)
+    monkeypatch.setattr(auth_mod, "CONFIG_FILE", tmp_path / "config.json")
+    monkeypatch.setattr(auth_mod, "CONFIG_DIR", tmp_path)
 
 
 # --------------------------------------------------------------------------
@@ -338,245 +326,92 @@ class TestPrintfulSession:
         path = str(tmp_path / "s.json")
         assert PrintfulSession(path).status()["session_file"] == path
 
+    def test_session_lives_beside_the_config_in_config_printful(self):
+        """Both halves: beside config.json, AND in ~/.config/printful.
 
-# --------------------------------------------------------------------------
-# Backend
-# --------------------------------------------------------------------------
+        Asserting only the relationship to CONFIG_FILE would keep passing if
+        the core's config directory itself moved somewhere else.
+        """
+        assert Path(DEFAULT_SESSION_FILE).parent == CORE_CONFIG_FILE.parent
+        assert Path(DEFAULT_SESSION_FILE) == (
+            Path.home() / ".config" / "printful" / "session.json"
+        )
 
-class TestCredentials:
-    def test_explicit_key_wins_over_env(self, monkeypatch):
-        monkeypatch.setenv("PRINTFUL_API_KEY", "from-env")
-        assert backend_mod.resolve_api_key("explicit") == "explicit"
-
-    def test_env_used_when_no_explicit(self, monkeypatch):
-        monkeypatch.setenv("PRINTFUL_API_KEY", "from-env")
-        assert backend_mod.resolve_api_key() == "from-env"
-
-    def test_config_used_when_no_env(self):
-        backend_mod.save_config({"api_key": "from-config"})
-        assert backend_mod.resolve_api_key() == "from-config"
-
-    def test_env_beats_config(self, monkeypatch):
-        backend_mod.save_config({"api_key": "from-config"})
-        monkeypatch.setenv("PRINTFUL_API_KEY", "from-env")
-        assert backend_mod.resolve_api_key() == "from-env"
-
-    def test_missing_key_raises_with_instructions(self):
-        with pytest.raises(PrintfulAuthError, match="printful.com/dashboard/api"):
-            backend_mod.resolve_api_key()
-
-    def test_store_id_resolution(self, monkeypatch):
-        assert backend_mod.resolve_store_id() is None
-        monkeypatch.setenv("PRINTFUL_STORE_ID", "42")
-        assert backend_mod.resolve_store_id() == "42"
-        assert backend_mod.resolve_store_id("7") == "7"
-
-
-class TestBackendHeaders:
-    def test_authorization_always_sent(self):
-        b = make_backend([FakeResponse(200, {"data": []})])
-        b.get("/countries")
-        assert b.session.calls[0]["headers"]["Authorization"] == "Bearer test-token"
-
-    def test_store_header_sent_when_set(self):
-        b = make_backend([FakeResponse(200, {"data": []})], store_id="777")
-        b.get("/orders")
-        assert b.session.calls[0]["headers"]["X-PF-Store-Id"] == "777"
-
-    def test_store_header_absent_when_unset(self):
-        b = make_backend([FakeResponse(200, {"data": []})])
-        b.get("/orders")
-        assert "X-PF-Store-Id" not in b.session.calls[0]["headers"]
-
-    def test_none_params_dropped(self):
-        b = make_backend([FakeResponse(200, {"data": []})])
-        b.get("/catalog-products", params={"limit": 5, "colors": None})
-        assert b.session.calls[0]["params"] == {"limit": 5}
-
-
-class TestBackendResponses:
-    def test_v2_returns_body_unchanged(self):
-        b = make_backend([FakeResponse(200, {"data": {"id": 1}})])
-        assert b.get("/orders/1") == {"data": {"id": 1}}
-
-    def test_v1_unwraps_result(self):
-        b = make_backend([FakeResponse(200, {"code": 200, "result": [{"id": 9}]})])
-        assert b.get("/store/products", version="v1") == [{"id": 9}]
-
-    def test_v1_without_result_returns_body(self):
-        b = make_backend([FakeResponse(200, {"other": 1})])
-        assert b.get("/x", version="v1") == {"other": 1}
-
-    def test_empty_body_returns_empty_dict(self):
-        b = make_backend([FakeResponse(204, {}, raw=b"")])
-        assert b.delete("/orders/1") == {}
-
-    def test_non_json_success_raises(self):
-        b = make_backend([FakeResponse(200, raw=b"<html>")])
-        with pytest.raises(PrintfulError, match="Invalid JSON"):
-            b.get("/x")
-
-
-class TestBackendErrors:
-    def test_v2_error_uses_detail(self):
-        b = make_backend([FakeResponse(400, {"detail": "Bad variant", "title": "T"})])
-        with pytest.raises(PrintfulError, match="Bad variant"):
-            b.get("/x")
-
-    def test_v2_error_falls_back_to_title(self):
-        b = make_backend([FakeResponse(400, {"title": "Validation failed"})])
-        with pytest.raises(PrintfulError, match="Validation failed"):
-            b.get("/x")
-
-    def test_v1_error_uses_error_message(self):
-        b = make_backend([FakeResponse(404, {"code": 404,
-                                             "error": {"message": "Not Found"}})])
-        with pytest.raises(PrintfulError, match="Not Found"):
-            b.get("/x", version="v1")
-
-    # --- Regression: the live v2 API does NOT use RFC 9457 --------------
-    # Verified against real 400 and 404 responses. Reading only detail/title
-    # reduced every v2 error to "Unknown error" and hid the cause.
-
-    def test_v2_error_reads_v1_style_envelope(self):
-        """A live v2 400 body, captured verbatim."""
-        b = make_backend([FakeResponse(400, {
-            "data": "This endpoint requires `store_id`!",
-            "error": {"reason": "BadRequest",
-                      "message": "This endpoint requires `store_id`!"},
-        })])
-        with pytest.raises(PrintfulError, match="requires `store_id`"):
-            b.post("/shipping-rates", json_data={})
-
-    def test_v2_404_reads_v1_style_envelope(self):
-        """A live v2 404 body, captured verbatim."""
-        b = make_backend([FakeResponse(404, {
-            "data": "Product 99999999 does not exist or is inactive.",
-            "error": {"reason": "NotFound",
-                      "message": "Product 99999999 does not exist or is inactive."},
-        })])
-        with pytest.raises(PrintfulError, match="does not exist or is inactive"):
-            b.get("/catalog-products/99999999")
-
-    def test_v2_error_never_degrades_to_unknown(self):
-        b = make_backend([FakeResponse(400, {
-            "data": "msg", "error": {"reason": "BadRequest", "message": "msg"}})])
-        with pytest.raises(PrintfulError) as exc:
-            b.get("/x")
-        assert exc.value.message != "Unknown error"
-
-    def test_error_message_from_data_string_only(self):
-        b = make_backend([FakeResponse(400, {"data": "plain message"})])
-        with pytest.raises(PrintfulError, match="plain message"):
-            b.get("/x")
-
-    def test_error_with_no_recognizable_shape_names_status(self):
-        b = make_backend([FakeResponse(500, {"weird": {"nested": 1}})])
-        with pytest.raises(PrintfulError, match="status 500"):
-            b.get("/x")
-
-    def test_error_body_preserved_in_detail(self):
-        body = {"data": "m", "error": {"reason": "BadRequest", "message": "m"}}
-        b = make_backend([FakeResponse(400, body)])
-        with pytest.raises(PrintfulError) as exc:
-            b.get("/x")
-        assert exc.value.detail == body
-
-    def test_401_mentions_expiry(self):
-        b = make_backend([FakeResponse(401, {})])
-        with pytest.raises(PrintfulAuthError, match="expire"):
-            b.get("/x")
-
-    def test_403_mentions_scope(self):
-        b = make_backend([FakeResponse(403, {})])
-        with pytest.raises(PrintfulAuthError, match="scope"):
-            b.get("/x")
-
-    @pytest.mark.parametrize("code", [429, 419])
-    def test_rate_limit_carries_retry_after(self, code):
-        b = make_backend([FakeResponse(code, {}, headers={"Retry-After": "30"})])
-        with pytest.raises(PrintfulRateLimitError) as exc:
-            b.get("/x")
-        assert exc.value.retry_after == "30"
-
-    def test_rate_limit_message_mentions_mockup_limits(self):
-        b = make_backend([FakeResponse(429, {}, headers={"Retry-After": "60"})])
-        with pytest.raises(PrintfulRateLimitError, match="2/60s new stores"):
-            b.get("/x")
-
-    def test_error_status_code_preserved(self):
-        b = make_backend([FakeResponse(422, {"detail": "nope"})])
-        with pytest.raises(PrintfulError) as exc:
-            b.get("/x")
-        assert exc.value.status_code == 422
-        assert exc.value.to_dict()["status_code"] == 422
+    def test_saved_session_is_not_world_readable(self, tmp_path):
+        """It holds the recipient block: name, address, email, phone."""
+        path = str(tmp_path / "s.json")
+        session = PrintfulSession(path)
+        session.draft.set_recipient(name="Jane", address1="1 St",
+                                    email="jane@example.com", phone="555")
+        session.save_session()
+        assert stat.S_IMODE(os.stat(path).st_mode) == 0o600
 
 
 # --------------------------------------------------------------------------
 # Orders
 # --------------------------------------------------------------------------
 
-class TestOrders:
-    def test_update_rejects_empty_payload(self):
-        with pytest.raises(ValueError, match="at least one field"):
-            orders_mod.update_order(make_backend(), "1", {})
+_ITEM = {"source": "catalog", "catalog_variant_id": 4012, "quantity": 1,
+         "placements": [{"placement": "front", "technique": "dtg",
+                         "layers": [{"type": "file", "url": "http://x/a.png"}]}]}
 
+
+class TestOrders:
     def test_confirm_targets_confirmation_endpoint(self):
         """The billable endpoint — asserted here so it is never called live."""
-        b = make_backend([FakeResponse(200, {"data": {"status": "pending"}})])
-        orders_mod.confirm_order(b, "123")
-        call = b.session.calls[0]
-        assert call["method"] == "POST"
-        assert call["url"].endswith("/v2/orders/123/confirmation")
+        t = FakeTransport([{"data": {"status": "pending"}}])
+        orders_mod.confirm_order(t, "123")
+        request = t.requests[0]
+        assert request.method == "POST"
+        assert request.path == "/orders/123/confirmation"
+        assert request.version == "v2"
 
-    def test_cancel_issues_delete(self):
-        b = make_backend([FakeResponse(204, {}, raw=b"")])
-        result = orders_mod.cancel_order(b, "123")
-        assert b.session.calls[0]["method"] == "DELETE"
-        assert result["status"] == "cancelled"
+    def test_cancel_reports_cancelled_when_the_api_returns_no_body(self):
+        t = FakeTransport([{}])
+        result = orders_mod.cancel_order(t, "123")
+        assert t.requests[0].method == "DELETE"
+        assert result == {"order_id": "123", "status": "cancelled"}
 
-    def test_create_posts_to_orders(self):
-        b = make_backend([FakeResponse(200, {"data": {"id": 5}})])
-        orders_mod.create_order(b, {"recipient": {}, "order_items": []})
-        assert b.session.calls[0]["url"].endswith("/v2/orders")
+    def test_create_sends_recipient_and_items_as_one_body(self):
+        """The command layer holds them apart; the order body puts them together."""
+        t = FakeTransport([{"data": {"id": 5}}])
+        orders_mod.create_order(t, {"country_code": "DE"}, [_ITEM], "ext-1")
+        request = t.requests[0]
+        assert request.path == "/orders"
+        assert request.json["recipient"] == {"country_code": "DE"}
+        assert request.json["order_items"][0]["catalog_variant_id"] == 4012
+        assert request.json["external_id"] == "ext-1"
 
     def test_estimate_polls_until_completed(self):
-        b = make_backend([
-            FakeResponse(200, {"data": {"id": "t1", "status": "pending"}}),
-            FakeResponse(200, {"data": {"id": "t1", "status": "pending"}}),
-            FakeResponse(200, {"data": {"id": "t1", "status": "completed",
-                                        "costs": {"total": "25.00"}}}),
+        t = FakeTransport([
+            {"data": {"id": "t1", "status": "pending"}},
+            {"data": {"id": "t1", "status": "pending"}},
+            {"data": {"id": "t1", "status": "completed",
+                      "costs": {"total": "25.00"}}},
         ])
-        result = orders_mod.estimate_costs(b, {}, interval=0, max_wait=5)
+        result = orders_mod.estimate_costs(t, {}, [_ITEM], interval=0, max_wait=5)
         assert result["data"]["status"] == "completed"
 
     def test_estimate_raises_on_failure_with_reasons(self):
-        b = make_backend([
-            FakeResponse(200, {"data": {"id": "t1", "status": "pending"}}),
-            FakeResponse(200, {"data": {"id": "t1", "status": "failed",
-                                        "failure_reasons": ["bad variant"]}}),
+        t = FakeTransport([
+            {"data": {"id": "t1", "status": "pending"}},
+            {"data": {"id": "t1", "status": "failed",
+                      "failure_reasons": ["bad variant"]}},
         ])
         with pytest.raises(PrintfulError, match="bad variant"):
-            orders_mod.estimate_costs(b, {}, interval=0, max_wait=5)
+            orders_mod.estimate_costs(t, {}, [_ITEM], interval=0, max_wait=5)
 
     def test_estimate_timeout_names_task(self):
-        b = make_backend([FakeResponse(200, {"data": {"id": "t9", "status": "pending"}})
-                          for _ in range(10)])
+        t = FakeTransport([{"data": {"id": "t9", "status": "pending"}}
+                           for _ in range(10)])
         with pytest.raises(PrintfulError, match="t9"):
-            orders_mod.estimate_costs(b, {}, interval=0, max_wait=0.01)
+            orders_mod.estimate_costs(t, {}, [_ITEM], interval=0, max_wait=0.01)
 
     def test_estimate_no_poll_returns_task(self):
-        b = make_backend([FakeResponse(200, {"data": {"id": "t1", "status": "pending"}})])
-        result = orders_mod.estimate_costs(b, {}, poll=False)
+        t = FakeTransport([{"data": {"id": "t1", "status": "pending"}}])
+        result = orders_mod.estimate_costs(t, {}, [_ITEM], poll=False)
         assert result["data"]["id"] == "t1"
-
-    def test_summarize_orders_handles_missing_costs(self):
-        summary = orders_mod.summarize_orders({"data": [{"id": 1, "status": "draft"}]})
-        assert summary["orders"][0]["total"] is None
-        assert summary["count"] == 1
-
-    def test_summarize_orders_empty(self):
-        assert orders_mod.summarize_orders({})["count"] == 0
+        assert len(t.requests) == 1
 
 
 # --------------------------------------------------------------------------
@@ -586,197 +421,145 @@ class TestOrders:
 class TestMockups:
     def test_create_requires_variants(self):
         with pytest.raises(ValueError, match="variant ID"):
-            mockups_mod.create_task(make_backend(), 71, [], "http://x/a.png")
+            mockups_mod.create_task(FakeTransport(), 71, [], "http://x/a.png")
 
     def test_create_requires_image(self):
         with pytest.raises(ValueError, match="image URL"):
-            mockups_mod.create_task(make_backend(), 71, [1], "")
+            mockups_mod.create_task(FakeTransport(), 71, [1], "")
 
-    def test_create_builds_nested_payload(self):
-        b = make_backend([FakeResponse(200, {"data": {"id": "t1"}})])
-        mockups_mod.create_task(b, 71, [4012], "http://x/a.png",
-                                mockup_style_ids=[5])
-        product = b.session.calls[0]["json"]["products"][0]
+    def test_create_forwards_every_option_to_the_right_parameter(self):
+        """The CLI forwards positionally across a parameter rename.
+
+        `mockup_style_ids` here is `style_ids` in the core builder, and the
+        placement/technique/format arguments sit between them. A slipped
+        position binds silently and builds a valid-looking wrong request.
+        """
+        t = FakeTransport([{"data": {"id": "t1"}}])
+        mockups_mod.create_task(t, 71, [4012], "http://x/a.png",
+                                "back", "embroidery", [5], "png")
+        body = t.requests[0].json
+        product = body["products"][0]
+        assert body["format"] == "png"
         assert product["catalog_product_id"] == 71
         assert product["catalog_variant_ids"] == [4012]
         assert product["mockup_style_ids"] == [5]
+        assert product["placements"][0]["placement"] == "back"
+        assert product["placements"][0]["technique"] == "embroidery"
         assert product["placements"][0]["layers"][0]["url"] == "http://x/a.png"
 
     def test_wait_raises_on_failed(self):
-        b = make_backend([FakeResponse(200, {"data": {"status": "failed",
-                                                      "reason": "bad file"}})])
+        t = FakeTransport([{"data": {"status": "failed", "reason": "bad file"}}])
         with pytest.raises(PrintfulError, match="bad file"):
-            mockups_mod.wait_for_task(b, "t1", max_wait=5, interval=0)
+            mockups_mod.wait_for_task(t, "t1", max_wait=5, interval=0)
 
     def test_wait_timeout_names_task(self):
-        b = make_backend([FakeResponse(200, {"data": {"status": "pending"}})
-                          for _ in range(5)])
+        t = FakeTransport([{"data": {"status": "pending"}} for _ in range(5)])
         with pytest.raises(PrintfulError, match="t7"):
-            mockups_mod.wait_for_task(b, "t7", max_wait=0.01, interval=0)
+            mockups_mod.wait_for_task(t, "t7", max_wait=0.01, interval=0)
 
-    def test_extract_urls_primary_and_extra(self):
-        data = {"data": [{"mockups": [
-            {"mockup_url": "http://x/1.jpg", "extra": [{"url": "http://x/2.jpg"}]}
-        ]}]}
-        assert mockups_mod.extract_mockup_urls(data) == [
-            "http://x/1.jpg", "http://x/2.jpg"
-        ]
-
-    def test_extract_urls_empty(self):
-        assert mockups_mod.extract_mockup_urls({}) == []
-
-    def test_extract_urls_malformed(self):
-        assert mockups_mod.extract_mockup_urls({"data": ["junk"]}) == []
+    def test_templates_ask_for_one_product_not_a_page(self):
+        """printful_core.endpoints.stores.list_templates shares this name and
+        takes (limit, offset) — a product ID there binds silently to limit."""
+        t = FakeTransport([{"data": []}])
+        mockups_mod.list_templates(t, 71)
+        assert t.requests[0].path == "/catalog-products/71/mockup-templates"
+        assert t.requests[0].params == {}
 
 
 # --------------------------------------------------------------------------
-# Catalog / shipping / files summarizers
+# Shapes the command layer depends on
 # --------------------------------------------------------------------------
 
-class TestSummarizers:
-    def test_products_empty(self):
-        assert catalog_mod.summarize_products({})["count"] == 0
+class TestSummarizedReturns:
+    """Listing operations summarize before returning.
 
-    def test_products_partial_payload(self):
-        out = catalog_mod.summarize_products({"data": [{"id": 1, "name": "Tee"}]})
-        assert out["products"][0]["type"] is None
-        assert out["products"][0]["techniques"] == ""
+    The command layer reads `summary["products"]`, `["count"]` and so on
+    directly. Summarizing a second time at the call site would silently yield
+    count 0 rather than raising, so the contract is pinned here.
+    """
 
-    def test_variants_empty(self):
-        assert catalog_mod.summarize_variants({})["count"] == 0
+    def test_products(self):
+        t = FakeTransport([{"data": [{"id": 1, "name": "Tee"}], "paging": {}}])
+        out = catalog_mod.list_products(t, limit=1)
+        assert out["count"] == 1
+        assert out["products"][0]["name"] == "Tee"
 
-    def test_rates_empty(self):
-        assert shipping_mod.summarize_rates({})["count"] == 0
+    def test_variants(self):
+        t = FakeTransport([{"data": [{"id": 4012, "size": "L", "color": "Black"}]}])
+        out = catalog_mod.list_variants(t, 71)
+        assert out["variants"][0]["size"] == "L"
+        assert out["count"] == 1
 
-    def test_countries_counts_states(self):
-        out = shipping_mod.summarize_countries(
-            {"data": [{"code": "US", "name": "United States", "states": [1, 2]}]}
-        )
-        assert out["countries"][0]["states"] == 2
+    def test_orders(self):
+        t = FakeTransport([{"data": [{"id": 1, "status": "draft"}]}])
+        out = orders_mod.list_orders(t)
+        assert out["orders"][0]["total"] is None
+        assert out["count"] == 1
 
-    def test_countries_without_states_key(self):
-        out = shipping_mod.summarize_countries({"data": [{"code": "DE"}]})
-        assert out["countries"][0]["states"] == 0
+    def test_rates(self):
+        t = FakeTransport([{"data": [{"shipping": "STANDARD",
+                                      "shipping_method_name": "Flat Rate",
+                                      "rate": "4.95"}]}])
+        out = shipping_mod.calculate_rates(t, {"country_code": "US"}, [_ITEM])
+        assert out["rates"][0]["id"] == "STANDARD"
+        assert out["rates"][0]["name"] == "Flat Rate"
+        assert out["count"] == 1
+
+    def test_stores(self):
+        t = FakeTransport([{"data": [{"id": 1, "name": "Alpha", "type": "native"}]}])
+        out = stores_mod.list_stores(t)
+        assert out["stores"][0]["name"] == "Alpha"
+        assert out["count"] == 1
 
 
 class TestCountriesPagination:
-    """Regression: /v2/countries defaults to 20 of ~239 rows and omits 'US'."""
+    """Regression: /v2/countries defaults to 20 of ~239 rows and omits 'US'.
+
+    The bug was found live and fixed once. The CLI must keep reaching the
+    country list through printful_core.pagination.collect_pages; swapping it
+    for a bare transport.send would issue one request and drop the rest, which
+    is what these two tests fail on.
+    """
 
     def _pages(self):
         return [
-            FakeResponse(200, {"data": [{"code": "AF"}, {"code": "AL"}],
-                               "paging": {"total": 5, "limit": 2, "offset": 0}}),
-            FakeResponse(200, {"data": [{"code": "DE"}, {"code": "GB"}],
-                               "paging": {"total": 5, "limit": 2, "offset": 2}}),
-            FakeResponse(200, {"data": [{"code": "US"}],
-                               "paging": {"total": 5, "limit": 2, "offset": 4}}),
+            {"data": [{"code": "AF"}, {"code": "AL"}],
+             "paging": {"total": 5, "limit": 2, "offset": 0}},
+            {"data": [{"code": "DE"}, {"code": "GB"}],
+             "paging": {"total": 5, "limit": 2, "offset": 2}},
+            {"data": [{"code": "US"}],
+             "paging": {"total": 5, "limit": 2, "offset": 4}},
         ]
 
-    def test_fetches_every_page(self):
-        b = make_backend(self._pages())
-        data = shipping_mod.list_countries(b)
-        codes = [c["code"] for c in data["data"]]
-        assert codes == ["AF", "AL", "DE", "GB", "US"]
-        assert data["paging"]["returned"] == 5
-        assert len(b.session.calls) == 3
+    def test_every_page_is_requested(self):
+        t = FakeTransport(self._pages())
+        summary = shipping_mod.list_countries(t)
+        assert [c["code"] for c in summary["countries"]] == [
+            "AF", "AL", "DE", "GB", "US"
+        ]
+        assert len(t.requests) == 3
 
     def test_us_present_after_pagination(self):
-        b = make_backend(self._pages())
-        summary = shipping_mod.summarize_countries(shipping_mod.list_countries(b))
+        t = FakeTransport(self._pages())
+        summary = shipping_mod.list_countries(t)
         assert "US" in {c["code"] for c in summary["countries"]}
         assert summary["count"] == 5
 
-    def test_opt_out_makes_one_call(self):
-        b = make_backend(self._pages())
-        shipping_mod.list_countries(b, all_pages=False)
-        assert len(b.session.calls) == 1
-
-    def test_first_request_uses_page_limit(self):
-        b = make_backend(self._pages())
-        shipping_mod.list_countries(b, all_pages=False)
-        assert b.session.calls[0]["params"]["limit"] == shipping_mod.PAGE_LIMIT
-
-    def test_missing_paging_returns_first_page(self):
-        b = make_backend([FakeResponse(200, {"data": [{"code": "US"}]})])
-        data = shipping_mod.list_countries(b)
-        assert len(data["data"]) == 1
-
-    def test_empty_page_breaks_loop(self):
-        b = make_backend([
-            FakeResponse(200, {"data": [{"code": "AF"}],
-                               "paging": {"total": 99, "limit": 1, "offset": 0}}),
-            FakeResponse(200, {"data": [], "paging": {"total": 99, "limit": 1}}),
-        ])
-        data = shipping_mod.list_countries(b)
-        assert len(data["data"]) == 1
-
 
 class TestShipping:
-    def test_rates_requires_items(self):
-        with pytest.raises(ValueError, match="at least one item"):
-            shipping_mod.calculate_rates(make_backend(), {"country_code": "US"}, [])
-
-    # --- Regression: live shipping-rates rejects an item without `source`
-    # ("must be of type `string`, `null` provided").
-
-    def test_rates_defaults_missing_source(self):
-        b = make_backend([FakeResponse(200, {"data": []})])
-        shipping_mod.calculate_rates(
-            b, {"country_code": "US"}, [{"catalog_variant_id": 4012, "quantity": 1}]
-        )
-        sent = b.session.calls[0]["json"]["order_items"][0]
-        assert sent["source"] == "catalog"
-
-    def test_rates_preserves_explicit_source(self):
-        b = make_backend([FakeResponse(200, {"data": []})])
-        shipping_mod.calculate_rates(
-            b, {"country_code": "US"},
-            [{"source": "sync_product", "catalog_variant_id": 1, "quantity": 1}],
-        )
-        assert b.session.calls[0]["json"]["order_items"][0]["source"] == "sync_product"
-
-    def test_rates_does_not_mutate_caller_items(self):
-        b = make_backend([FakeResponse(200, {"data": []})])
-        items = [{"catalog_variant_id": 4012, "quantity": 1}]
-        shipping_mod.calculate_rates(b, {"country_code": "US"}, items)
-        assert "source" not in items[0]
-
-    # --- Regression: rate rows are keyed `shipping` / `shipping_method_name`,
-    # not `id` / `name`. Body captured from a live response.
-
-    def test_summarize_rates_reads_live_keys(self):
-        live = {"data": [{
-            "shipping": "STANDARD",
-            "shipping_method_name": "Flat Rate (Estimated delivery: Sep 23-25)",
-            "rate": "4.95", "currency": "USD",
-            "min_delivery_days": 4, "max_delivery_days": 6,
-            "min_delivery_date": "2026-09-23", "max_delivery_date": "2026-09-25",
-        }]}
-        row = shipping_mod.summarize_rates(live)["rates"][0]
-        assert row["id"] == "STANDARD"
-        assert row["name"].startswith("Flat Rate")
-        assert row["rate"] == "4.95"
-        assert row["min_date"] == "2026-09-23"
-
-    def test_summarize_rates_falls_back_to_id_name(self):
-        legacy = {"data": [{"id": "X", "name": "Legacy", "rate": "1.00"}]}
-        row = shipping_mod.summarize_rates(legacy)["rates"][0]
-        assert row["id"] == "X"
-        assert row["name"] == "Legacy"
-
     def test_tax_targets_v1(self):
-        b = make_backend([FakeResponse(200, {"code": 200, "result": {"rate": 0.08}})])
-        shipping_mod.calculate_tax(b, "US", "CA", "LA", "90001")
-        call = b.session.calls[0]
-        assert "/v2/" not in call["url"]
-        assert call["url"].endswith("/tax/rates")
-        assert call["json"]["recipient"]["state_code"] == "CA"
+        t = FakeTransport([{"rate": 0.08}])
+        shipping_mod.calculate_tax(t, "US", "CA", "LA", "90001")
+        request = t.requests[0]
+        assert request.version == "v1"
+        assert request.path == "/tax/rates"
+        assert request.json["recipient"]["state_code"] == "CA"
 
 
 class TestFiles:
     def test_add_requires_url(self):
         with pytest.raises(ValueError, match="URL is required"):
-            files_mod.add_file(make_backend(), "")
+            files_mod.add_file(FakeTransport(), "")
 
     def test_list_added_is_labelled_session_local(self):
         out = files_mod.list_added([{"id": 1, "filename": "a.png"}])
@@ -801,7 +584,7 @@ def _fresh_cli():
     from printful_cli import printful_cli
 
     printful_cli._session = None
-    printful_cli._backend = None
+    printful_cli._transport = None
     printful_cli._repl_mode = False
     return printful_cli
 
@@ -849,7 +632,7 @@ class TestCLIGuards:
         assert payload["dry_run"] is True
         assert payload["would_post"] == "/v2/orders/123/confirmation"
         # No backend was ever constructed, so no credentials were needed.
-        assert cli_mod._backend is None
+        assert cli_mod._transport is None
 
     def test_json_error_output_is_parseable(self, tmp_path):
         cli_mod = _fresh_cli()
@@ -894,7 +677,7 @@ class TestCLIGuards:
 
     def test_config_get_masks_api_key(self, tmp_path):
         cli_mod = _fresh_cli()
-        backend_mod.save_config({"api_key": "secret-token-1234"})
+        auth_mod.save_config({"api_key": "secret-token-1234"})
         result = CliRunner().invoke(
             cli_mod.cli,
             ["--json", "--session", _session_path(tmp_path), "config", "get"],
@@ -926,10 +709,10 @@ class TestCLIGuards:
         """An agent must get the store list back, never a blocked prompt."""
         cli_mod = _fresh_cli()
         monkeypatch.setenv("PRINTFUL_API_KEY", "t")
-        cli_mod._backend = make_backend([FakeResponse(200, {"data": [
+        cli_mod._transport = FakeTransport([{"data": [
             {"id": 1, "name": "Alpha", "type": "native"},
             {"id": 2, "name": "Beta", "type": "square"},
-        ]})])
+        ]}])
         result = CliRunner().invoke(
             cli_mod.cli,
             ["--json", "--session", _session_path(tmp_path), "store", "use"],
@@ -962,17 +745,18 @@ class TestCLIGuards:
             obj={},
         )
         assert json.loads(result.output)["saved_to_config"] is True
-        assert backend_mod.load_config()["store_id"] == "42"
+        assert auth_mod.load_config()["store_id"] == "42"
 
     def test_store_id_error_gets_actionable_hint(self, tmp_path, monkeypatch):
         """The account-level token error must say how to fix itself."""
         cli_mod = _fresh_cli()
         monkeypatch.setenv("PRINTFUL_API_KEY", "t")
-        cli_mod._backend = make_backend([FakeResponse(400, {
-            "data": "This endpoint requires `store_id`!",
-            "error": {"reason": "BadRequest",
-                      "message": "This endpoint requires `store_id`!"},
-        })])
+        cli_mod._transport = FakeTransport([PrintfulError(
+            "This endpoint requires `store_id`!", status_code=400,
+            detail={"data": "This endpoint requires `store_id`!",
+                    "error": {"reason": "BadRequest",
+                              "message": "This endpoint requires `store_id`!"}},
+        )])
         result = CliRunner().invoke(
             cli_mod.cli,
             ["--json", "--session", _session_path(tmp_path), "store", "list"],

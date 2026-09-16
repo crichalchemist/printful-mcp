@@ -51,13 +51,17 @@ class TestFiles:
 
 class TestStores:
     def test_list_path(self):
-        assert stores.list_stores().path == "/stores"
+        req = stores.list_stores()
+        assert req.path == "/stores"
+        assert req.version == "v2"
 
     def test_statistics_path_and_params(self):
         req = stores.get_statistics(1135966, "2026-01-01", "2026-03-01")
         assert req.path == "/stores/1135966/statistics"
         assert req.params["date_from"] == "2026-01-01"
+        assert req.params["date_to"] == "2026-03-01"
         assert req.params["report_types"] == "sales_and_costs,profit"
+        assert "currency" not in req.params
 
     def test_templates_use_v1(self):
         req = stores.list_templates()
@@ -72,4 +76,6 @@ class TestSync:
         assert req.path == "/store/products"
 
     def test_get_uses_v1(self):
-        assert sync.get_product(9).path == "/store/products/9"
+        req = sync.get_product(9)
+        assert req.version == "v1"
+        assert req.path == "/store/products/9"

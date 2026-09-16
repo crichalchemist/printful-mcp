@@ -112,6 +112,21 @@ def test_a_variant_row_carries_the_size_and_color_a_buyer_picks_by():
     assert "**Color:** Black (#000000)" in out
 
 
+def test_a_variant_page_past_the_end_still_names_its_product_and_the_total():
+    """An empty page is an ordinary API response, not an error.
+
+    `variants` takes `product_id` as an argument because the body does not
+    carry it, so the heading is the only thing telling a caller which product
+    came back empty. `total` matters most here: a page past the end shows no
+    rows while 42 variants exist, and a caller that reads only the rows
+    concludes the product has none.
+    """
+    out = markdown.variants({"data": [], "paging": {"total": 42}}, product_id=71)
+    assert "# Variants for Product 71" in out
+    assert "Total variants: 42" in out
+    assert "Showing 0 variants" in out
+
+
 def test_variant_pricing_keeps_every_line_tied_to_its_currency():
     """A bare number is unusable when the account bills in something else,
     and this renderer prints two separate price lists (base technique

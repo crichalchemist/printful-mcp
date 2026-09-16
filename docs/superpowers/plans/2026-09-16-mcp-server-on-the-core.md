@@ -3682,8 +3682,9 @@ from printful_mcp.models.inputs import (
     GetProductInput,
     ListCategoriesInput,
     ListCatalogProductsInput,
+    ListStoreTemplatesInput,
 )
-from printful_mcp.tools import catalog, orders, shipping
+from printful_mcp.tools import catalog, orders, shipping, stores
 from printful_mcp.transport import get_transport
 
 pytestmark = pytest.mark.live

@@ -211,8 +211,9 @@ Rate limit: 120 requests per 60 seconds
 ### 📦 Order Tools
 
 **printful_create_order**
-- Create draft order with recipient
-- Required: Name, address, city, state, country, zip
+- Create draft order with recipient and items
+- Required: Name, address, city, state, country, zip, and `items_json`
+- `items_json`: JSON array of items, each with `source`, `catalog_variant_id`, `quantity`, and `placements` carrying the artwork — an item with no design is rejected
 - Optional: Phone, email, external_id
 - Returns: Order ID (save this!)
 

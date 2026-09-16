@@ -311,4 +311,4 @@ printful
 
 ## Version
 
-printful 1.0.0
+printful 0.1.0

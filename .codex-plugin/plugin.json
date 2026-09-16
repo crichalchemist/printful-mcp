@@ -1,0 +1,25 @@
+{
+  "name": "printful-mcp",
+  "version": "0.1.0",
+  "description": "Printful API for agents: an MCP server with 32 tools and a CLI, on one shared core.",
+  "author": {
+    "name": "Courtney Andrew Richardson"
+  },
+  "repository": "https://github.com/crichalchemist/printful-mcp",
+  "license": "MIT",
+  "keywords": [
+    "printful",
+    "print-on-demand",
+    "mcp",
+    "ecommerce",
+    "fulfillment"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Printful",
+    "shortDescription": "Print-on-demand catalog, orders, mockups and shipping.",
+    "longDescription": "An MCP server exposing 32 Printful tools \u2014 catalog browsing, order drafting and confirmation, mockup generation, shipping and tax rates, file uploads, store and sync-product management \u2014 plus a `printful` CLI over the same shared core.",
+    "developerName": "Courtney Andrew Richardson"
+  }
+}

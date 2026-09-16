@@ -1,0 +1,5 @@
+{
+  "name": "printful-mcp",
+  "version": "0.1.0",
+  "description": "Use the Printful MCP server's 32 tools: catalog, orders, mockups, shipping, files, stores, sync."
+}

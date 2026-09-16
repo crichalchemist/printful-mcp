@@ -18,6 +18,8 @@ from __future__ import annotations
 
 import json
 import os
+import pathlib
+import re
 import subprocess
 import sys
 from typing import ClassVar
@@ -409,9 +411,19 @@ class TestCLISubprocess:
         assert "catalog" in result.stdout
 
     def test_version(self):
+        """The installed binary reports the version the project declares.
+
+        Read from `pyproject.toml` rather than hardcoded. A literal here is how
+        `printful_cli.__version__` drifted to 1.0.0 while `pyproject.toml` — what
+        a `pip install` actually publishes — stayed at 0.1.0: this assertion was
+        guarding the disagreement instead of catching it.
+        """
+        pyproject = pathlib.Path(__file__).resolve().parents[3] / "pyproject.toml"
+        declared = re.search(r'^version = "(.*)"$', pyproject.read_text(), re.M)
+        assert declared, f"no version line in {pyproject}"
         result = self._run(["--version"])
         assert result.returncode == 0
-        assert "1.0.0" in result.stdout
+        assert declared.group(1) in result.stdout
 
     def test_confirm_without_yes_refuses(self, tmp_path):
         """The money guard must hold through the real installed binary."""

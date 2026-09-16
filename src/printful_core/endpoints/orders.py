@@ -64,7 +64,8 @@ def create_order(recipient: Dict[str, Any], items: List[Dict[str, Any]],
         raise ValueError("Creating an order requires at least one item.")
     _require_placements(items)
 
-    body: Dict[str, Any] = {"recipient": recipient, "order_items": items}
+    body: Dict[str, Any] = {"recipient": dict(recipient),
+                            "order_items": [dict(item) for item in items]}
     if external_id:
         body["external_id"] = external_id
     if shipping:
@@ -102,7 +103,8 @@ def create_estimation_task(recipient: Dict[str, Any],
     if not items:
         raise ValueError("Estimation requires at least one item.")
     return Request("POST", "/order-estimation-tasks",
-                   json={"recipient": recipient, "order_items": items})
+                   json={"recipient": dict(recipient),
+                        "order_items": [dict(item) for item in items]})
 
 
 def get_estimation_task(task_id: str) -> Request:

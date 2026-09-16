@@ -95,3 +95,18 @@ def test_build_catalog_item_shapes_placements():
 def test_build_catalog_item_rejects_zero_quantity():
     with pytest.raises(ValueError, match="quantity must be >= 1"):
         orders.build_catalog_item(4012, 0)
+
+
+def test_create_order_does_not_alias_caller_recipient():
+    """A caller reusing a recipient dict must not retroactively alter a built request."""
+    recipient = dict(RECIPIENT)
+    req = orders.create_order(recipient, [ITEM])
+    recipient["zip"] = "99999"
+    assert req.json["recipient"]["zip"] != "99999"
+
+
+def test_create_order_does_not_mutate_caller_items():
+    items = [dict(ITEM)]
+    req = orders.create_order(RECIPIENT, items)
+    items[0]["quantity"] = 999
+    assert req.json["order_items"][0]["quantity"] != 999

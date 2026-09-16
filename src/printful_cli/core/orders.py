@@ -26,9 +26,10 @@ def get_order(transport: SyncTransport, order_id: str) -> Dict[str, Any]:
 
 def create_order(transport: SyncTransport, recipient: Dict[str, Any],
                  items: List[Dict[str, Any]],
-                 external_id: Optional[str] = None) -> Dict[str, Any]:
+                 external_id: Optional[str] = None,
+                 shipping: Optional[str] = None) -> Dict[str, Any]:
     return transport.send(
-        endpoints.create_order(recipient, items, external_id))
+        endpoints.create_order(recipient, items, external_id, shipping))
 
 
 def update_order(transport: SyncTransport, order_id: str,

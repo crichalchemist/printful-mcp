@@ -469,7 +469,7 @@ def orders_create(ctx, items_json, name, address1, city, state_code, country_cod
 
     data = orders_mod.create_order(
         get_transport(ctx), payload["recipient"], payload["order_items"],
-        payload.get("external_id"),
+        payload.get("external_id"), payload.get("shipping"),
     )
     body = data.get("data", data)
     sess.save_history(f"orders create -> {body.get('id')}", {"id": body.get("id")})

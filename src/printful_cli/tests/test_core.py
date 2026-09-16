@@ -696,6 +696,39 @@ class TestCLIGuards:
         assert cli_mod._parse_ids(" 1 , 2 ,, 3 ") == [1, 2, 3]
         assert cli_mod._parse_ids(None) == []
 
+    def test_draft_shipping_method_reaches_the_order_request(self, tmp_path):
+        """A shipping method on the draft must arrive at the API.
+
+        Asserted against the Request the transport received, not against
+        `to_api_payload()`. The payload-level assertion in
+        `TestDraftOrder::test_to_api_payload_includes_optional_fields` stayed
+        green while the command layer dropped the key one call later, which is
+        exactly the failure this test exists to catch.
+        """
+        cli_mod = _fresh_cli()
+        path = _session_path(tmp_path, "shipping.json")
+        with open(path, "w") as handle:
+            json.dump({"draft": {
+                "recipient": {"name": "J", "address1": "1 St", "city": "Berlin",
+                              "country_code": "DE", "zip": "10115"},
+                "items": [{"source": "catalog", "catalog_variant_id": 4012,
+                           "quantity": 1, "placements": [{
+                               "placement": "front", "technique": "dtg",
+                               "layers": [{"type": "file",
+                                           "url": "http://x/a.png"}]}]}],
+                "external_id": None,
+                "shipping": "STANDARD",
+            }, "store_id": None, "files": [], "history": []}, handle)
+
+        cli_mod._transport = FakeTransport([{"data": {"id": 999}}])
+        result = CliRunner().invoke(
+            cli_mod.cli, ["--json", "--session", path, "orders", "create"], obj={},
+        )
+        assert result.exit_code == 0, result.output
+        sent = cli_mod._transport.requests[0]
+        assert sent.path == "/orders"
+        assert sent.json["shipping"] == "STANDARD"
+
     def test_dry_run_suppresses_session_write(self, tmp_path):
         cli_mod = _fresh_cli()
         path = _session_path(tmp_path, "dry.json")

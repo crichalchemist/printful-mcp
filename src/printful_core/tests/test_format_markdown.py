@@ -56,9 +56,10 @@ def test_a_catalog_product_page_carries_every_fact_a_buyer_needs():
 
 
 def test_a_product_list_page_reports_the_total_not_just_what_it_shows():
-    """A page of 1 out of 239 must not read as 1 product existing, and the
-    per-row techniques are what tells a caller whether a product supports
-    the print method they need before they fetch its full detail.
+    """A page of 1 out of 239 must not read as 1 product existing, and a
+    page of 1 must not read as 239 products showing either -- the shown
+    count and the grand total are two different numbers on this line, and
+    collapsing them either way is a carry-over accounting bug.
     """
     out = markdown.products(
         {
@@ -75,6 +76,7 @@ def test_a_product_list_page_reports_the_total_not_just_what_it_shows():
         }
     )
     assert "239 total" in out
+    assert "Showing 1 products" in out
     assert "offset: 10" in out
     assert "limit: 50" in out
     assert "## Tee" in out
@@ -193,6 +195,7 @@ def test_a_category_row_carries_the_id_a_caller_drills_into():
         }
     )
     assert "2 total" in out
+    assert "Showing 2 categories" in out
     assert "Men's clothing" in out
     assert "ID 24" in out
     assert "T-shirts" in out
@@ -276,6 +279,7 @@ def test_a_shipping_rate_reports_customs_risk_per_shipment_not_just_price():
             ],
         }
     )
+    assert "Found 1 shipping options" in out
     assert "## Flat Rate" in out
     assert "**Rate:** 4.95 USD" in out
     assert "4-6 days" in out
@@ -301,6 +305,7 @@ def test_a_country_row_surfaces_the_state_codes_shipping_needs():
             ],
         }
     )
+    assert "# Available Countries (2 total)" in out
     assert "## United States (US)" in out
     assert "**States:** 1 available" in out
     assert "California (CA)" in out
@@ -315,8 +320,28 @@ def test_a_tax_answer_distinguishes_zero_from_not_required():
     number that can legitimately be zero. A renderer reading the wrong key
     gets a falsy default and prints "no" for a destination that does charge
     tax, which is a wrong answer shaped like a right one.
+
+    `/tax/rates` is a v1 endpoint (`endpoints/shipping.py`), and
+    `transport._normalize` unwraps its `result` envelope before
+    `tools/shipping.py` ever calls this renderer -- so the body
+    `printful_calculate_tax` actually passes is bare, not `{"data": ...}`.
+    That bare case is the production path and is asserted first. `tax` also
+    accepts an enveloped body defensively -- it is the only one of these
+    eleven renderers with a both-shapes guard, because it is the only v1
+    endpoint among them -- and the enveloped case below pins that branch so
+    a future edit cannot delete it silently, even though production never
+    sends that shape.
     """
     out = markdown.tax({"required": True, "rate": 0.0825, "shipping_taxable": True})
     assert "**Tax required:** yes" in out
     assert "0.0825" in out
     assert "**Shipping taxable:** yes" in out
+
+    not_required = markdown.tax({"required": False, "rate": 0.0825, "shipping_taxable": False})
+    assert "**Tax required:** no" in not_required
+    assert "**Shipping taxable:** no" in not_required
+
+    enveloped = markdown.tax({"data": {"required": True, "rate": 0.0825, "shipping_taxable": True}})
+    assert "**Tax required:** yes" in enveloped
+    assert "0.0825" in enveloped
+    assert "**Shipping taxable:** yes" in enveloped

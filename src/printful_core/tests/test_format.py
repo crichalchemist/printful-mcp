@@ -39,6 +39,17 @@ class TestRates:
     def test_empty(self):
         assert summary.rates({})["count"] == 0
 
+    def test_live_keys_win_when_both_present(self):
+        """A row carrying both shapes must resolve to the live keys, not the documented ones."""
+        data = {"data": [{
+            "shipping": "LIVE", "shipping_method_name": "LiveName",
+            "id": "DOCS", "name": "DocsName",
+            "rate": "1.00", "currency": "USD",
+        }]}
+        row = summary.rates(data)["rates"][0]
+        assert row["id"] == "LIVE"
+        assert row["name"] == "LiveName"
+
 
 class TestCountries:
     def test_counts_states(self):
@@ -55,6 +66,13 @@ class TestOrders:
         out = summary.orders({"data": [{"id": 1, "status": "draft"}]})
         assert out["orders"][0]["total"] is None
         assert out["count"] == 1
+
+    def test_does_not_mutate_input(self):
+        import copy
+        data = {"data": [{"id": 1, "status": "draft"}]}
+        snapshot = copy.deepcopy(data)
+        summary.orders(data)
+        assert data == snapshot
 
 
 class TestMockupUrls:

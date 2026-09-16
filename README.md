@@ -245,7 +245,7 @@ printful_get_variant_prices(
 
 ```python
 # Ask your AI assistant:
-"Create a draft order for John Doe at 123 Main St, Los Angeles, CA 90001"
+"Create a draft order for John Doe at 123 Main St, Los Angeles, CA 90001, one unit of variant 4012 with my design"
 
 # It will use:
 printful_create_order(
@@ -254,9 +254,15 @@ printful_create_order(
     recipient_city="Los Angeles",
     recipient_state_code="CA",
     recipient_country_code="US",
-    recipient_zip="90001"
+    recipient_zip="90001",
+    items_json='[{"source": "catalog", "catalog_variant_id": 4012, "quantity": 1, '
+               '"placements": [{"placement": "front", "technique": "dtg", '
+               '"layers": [{"type": "file", "url": "https://example.com/art.png"}]}]}]'
 )
 ```
+
+`items_json` is required, and every item needs `placements` carrying the artwork —
+Printful rejects an order item with no design attached.
 
 ### 🎨 Example 4: Generate Product Mockups
 

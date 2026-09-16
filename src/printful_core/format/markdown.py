@@ -377,3 +377,60 @@ def tax(data: Dict[str, Any]) -> str:
         f"",
     ]
     return "\n".join(lines)
+
+
+def mockup_task(body: Dict[str, Any]) -> str:
+    """One mockup task, in whichever state it is in."""
+    lines = [f"# Mockup Task {body['id']}", f"", f"**Status:** {body['status']}", f""]
+    if body['status'] == 'completed':
+        variant_mockups = body.get('catalog_variant_mockups', [])
+        lines.append(f"## Generated Mockups ({len(variant_mockups)} variants)")
+        for vm in variant_mockups:
+            lines.append(f"### Variant {vm['catalog_variant_id']}")
+            for mockup in vm.get('mockups', []):
+                lines.extend([
+                    f"- **{mockup['display_name']}** ({mockup['placement']})",
+                    f"  - Style ID: {mockup['style_id']}",
+                    f"  - URL: {mockup['mockup_url']}",
+                ])
+            lines.append("")
+    elif body['status'] == 'pending':
+        lines.append("⏳ Mockup generation in progress. Check again in a few seconds.")
+    elif body['status'] == 'failed':
+        lines.append("❌ Mockup generation failed.")
+        if body.get('failure_reasons'):
+            lines.append("\n**Reasons:**")
+            for reason in body['failure_reasons']:
+                lines.append(f"- {reason.get('detail', 'Unknown error')}")
+    return "\n".join(lines)
+
+
+def mockup_styles(data: Dict[str, Any], product_id: int) -> str:
+    """The mockup styles available for one product."""
+    rows = data.get('data', [])
+    lines = [f"# Mockup Styles for Product {product_id} ({len(rows)})", f""]
+    for row in rows:
+        lines.extend([
+            f"## {row.get('name', 'Style')} — ID {row.get('id')}",
+            f"- **Placement:** {row.get('placement', 'N/A')}",
+            f"- **Technique:** {row.get('technique', 'N/A')}",
+            f"",
+        ])
+    return "\n".join(lines)
+
+
+def mockup_templates(data: Dict[str, Any], product_id: int) -> str:
+    """The print-area templates for one product."""
+    rows = data.get('data', [])
+    lines = [f"# Mockup Templates for Product {product_id} ({len(rows)})", f""]
+    for row in rows:
+        lines.extend([
+            f"## Template {row.get('id')}",
+            f"- **Placement:** {row.get('placement', 'N/A')}",
+            f"- **Technique:** {row.get('technique', 'N/A')}",
+            f"- **Print area:** {row.get('print_area_width')}x"
+            f"{row.get('print_area_height')}",
+            f"- **Image:** {row.get('image_url', 'N/A')}",
+            f"",
+        ])
+    return "\n".join(lines)

@@ -32,6 +32,8 @@ from .models.inputs import (
     CalculateTaxInput,
     CreateMockupTaskInput,
     GetMockupTaskInput,
+    ListMockupStylesInput,
+    ListMockupTemplatesInput,
     AddFileInput,
     GetFileInput,
     ListStoresInput,
@@ -483,11 +485,11 @@ async def printful_calculate_tax(params: CalculateTaxInput) -> str:
 async def printful_create_mockup_task(params: CreateMockupTaskInput) -> str:
     """
     Generate product mockup images.
-    
+
     Creates an async task to generate mockup images showing your design
     on the product. Returns task ID to check status and get URLs.
     """
-    return await mockups.create_mockup_task(get_client(), params)
+    return await mockups.create_mockup_task(get_transport(), params)
 
 
 @mcp.tool(
@@ -503,11 +505,46 @@ async def printful_create_mockup_task(params: CreateMockupTaskInput) -> str:
 async def printful_get_mockup_task(params: GetMockupTaskInput) -> str:
     """
     Check mockup generation status and get results.
-    
+
     Returns task status (pending/completed/failed) and mockup image URLs
     if completed. Typically takes 10-30 seconds to generate.
     """
-    return await mockups.get_mockup_task(get_client(), params)
+    return await mockups.get_mockup_task(get_transport(), params)
+
+
+@mcp.tool(
+    name="printful_list_mockup_styles",
+    annotations={
+        "title": "List Mockup Styles",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    }
+)
+async def printful_list_mockup_styles(params: ListMockupStylesInput) -> str:
+    """
+    List the mockup styles available for a catalog product. Style IDs feed
+    printful_create_mockup_task.
+    """
+    return await mockups.list_mockup_styles(get_transport(), params)
+
+
+@mcp.tool(
+    name="printful_list_mockup_templates",
+    annotations={
+        "title": "List Mockup Templates",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    }
+)
+async def printful_list_mockup_templates(params: ListMockupTemplatesInput) -> str:
+    """
+    List the print-area templates for a catalog product.
+    """
+    return await mockups.list_mockup_templates(get_transport(), params)
 
 
 # ========== FILE TOOLS ==========

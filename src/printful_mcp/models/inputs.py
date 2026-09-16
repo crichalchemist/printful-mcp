@@ -192,7 +192,10 @@ class CreateMockupTaskInput(BaseModel):
     """Input for creating a mockup generation task."""
     product_id: int = Field(..., description="Catalog product ID")
     variant_ids: str = Field(..., description="Comma-separated variant IDs")
-    mockup_style_ids: str = Field(..., description="Comma-separated mockup style IDs")
+    mockup_style_ids: Optional[str] = Field(
+        default=None,
+        description=("Comma-separated mockup style IDs. Omit to let Printful "
+                     "choose its defaults. Find IDs with printful_list_mockup_styles."))
     design_url: str = Field(..., description="URL to design image file")
     placement: str = Field(default="front", description="Placement (e.g., front, back)")
     technique: str = Field(default="dtg", description="Technique (e.g., dtg, embroidery)")
@@ -203,6 +206,20 @@ class GetMockupTaskInput(BaseModel):
     """Input for getting mockup task status."""
     task_id: str = Field(..., description="Mockup task ID")
     format: Literal["markdown", "json"] = Field(default="markdown", description="Output format")
+
+
+class ListMockupStylesInput(BaseModel):
+    """Input for printful_list_mockup_styles."""
+    product_id: int = Field(description="Catalog product ID")
+    format: Literal["markdown", "json"] = Field(
+        default="markdown", description="Response format")
+
+
+class ListMockupTemplatesInput(BaseModel):
+    """Input for printful_list_mockup_templates."""
+    product_id: int = Field(description="Catalog product ID")
+    format: Literal["markdown", "json"] = Field(
+        default="markdown", description="Response format")
 
 
 # File Models

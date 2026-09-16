@@ -211,7 +211,7 @@ For Cursor (`~/.cursor/mcp.json`):
     "printful": {
       "command": "python",
       "args": ["-m", "printful_mcp"],
-      "cwd": "/path/to/printful-ph-mcp",
+      "cwd": "/path/to/printful-mcp",
       "env": {
         "PRINTFUL_API_KEY": "your-actual-token-here"
       }
@@ -227,7 +227,7 @@ For Claude Desktop (`~/Library/Application Support/Claude/claude_desktop_config.
     "printful": {
       "command": "python",
       "args": ["-m", "printful_mcp"],
-      "cwd": "/path/to/printful-ph-mcp",
+      "cwd": "/path/to/printful-mcp",
       "env": {
         "PRINTFUL_API_KEY": "your-actual-token-here"
       }

@@ -52,6 +52,13 @@ declares a transport `type` for each server." Converting would mean writing a
 second, differently-shaped MCP file; the repository ships one `.mcp.json` that
 both Claude Code and this manifest reference.
 
+**That shared `.mcp.json` is where Path 1's `${PRINTFUL_API_KEY}` caveat bites,
+so it is repeated here.** The manifest's `mcpServers` points at `.mcp.json`,
+whose `env` block holds `"${PRINTFUL_API_KEY}"` — a placeholder Codex passes
+through literally rather than expanding. Supply the token the way Path 1
+describes, with `env_vars` or an `env` literal, rather than relying on the
+manifest to resolve it.
+
 Source: <https://developers.openai.com/codex/plugins/build>
 
 ## Path 3 — no plugin at all

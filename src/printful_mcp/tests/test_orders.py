@@ -256,11 +256,23 @@ async def test_a_failed_estimate_reports_why(transport):
 
 
 async def test_estimation_does_not_require_artwork(transport):
-    """Rates can be quoted for an item with no placements.
+    """The core builder deliberately does not guard placements for an estimate.
 
-    Order creation rejects such an item; estimation does not. Adding a
-    placements check here would break a working path -- this was confirmed
-    against the live API, not assumed.
+    The live API *does* reject a catalog item with no placements here, with the
+    same message the order endpoint gives, and it rejects on the initial POST.
+    That contract is established by the live test
+    `TestLiveDraftOrder::test_estimation_rejects_an_item_with_no_artwork` in
+    src/printful_cli/tests/test_full_e2e.py -- follow that pointer rather than
+    re-deriving it here, and note that a FakeTransport like this one can never
+    establish it.
+
+    What this test pins is the decision not to pre-empt that rejection locally.
+    `create_order` guards placements; `create_estimation_task` does not, and the
+    asymmetry is deliberate rather than an oversight: a local guard raises
+    before the request is sent, so the live test above would stop reaching
+    Printful at all and the only evidence of the API's real behaviour would be
+    destroyed. Estimation is free and places no order, so learning it from the
+    API costs one round trip on a call that charges nothing.
     """
     items = [{"source": "catalog", "catalog_variant_id": 4012, "quantity": 1}]
     out = await orders.create_estimation_task(

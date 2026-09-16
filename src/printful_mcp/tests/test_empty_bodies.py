@@ -21,6 +21,29 @@ import pytest
 from printful_core.request import Request
 from printful_mcp.tests.toolsamples import REGISTERED, SKIP, sample_input, tool_function
 
+# The tools that answer an empty body with something other than a rendered
+# document, each pinned to exactly what it returns. Pinned rather than excused:
+# a list that excuses tools goes stale silently, while one that asserts what
+# each tool returns goes stale loudly -- and a fourth tool that starts
+# short-circuiting fails the general assertion below instead of slipping
+# through it.
+#
+# `create_mockup_task` and `get_mockup_task` short-circuit on `if not body:` and
+# never reach a renderer at all. That is the structural reason the unguarded
+# `body['id']` / `body['status']` reads in tools/mockups.py stayed invisible to
+# this file: only a non-empty body missing a key reaches them, which
+# test_mockups.py supplies. `create_estimation_task` does read the body --
+# `Task ID: None` is a `.get` that found nothing -- it renders prose, not a
+# heading.
+NOT_A_RENDERED_DOCUMENT = {
+    "printful_create_mockup_task": "{}",
+    "printful_get_mockup_task": "No task found with ID 1",
+    "printful_create_estimation_task": (
+        "Estimation task created.\n\nTask ID: None\nStatus: None\n\n"
+        "Read the result with printful_get_estimation_task."
+    ),
+}
+
 
 class _EmptyBodyTransport:
     """Answers every request with `{}`, as a 204 or empty 2xx does.
@@ -80,17 +103,17 @@ async def test_an_empty_success_body_is_reported_not_raised(tool_name):
         "tell that apart from a tool that did nothing."
     )
 
-    # Deliberately NOT asserted: that `result` looks like a rendered document --
-    # a "#" heading, an "Error:" or a "✓". Three tools legitimately return none
-    # of those, and a prefix list widened until they pass asserts nothing:
-    #
-    #   printful_create_mockup_task     -> "{}"
-    #   printful_get_mockup_task        -> "No task found with ID 1"
-    #   printful_create_estimation_task -> "Estimation task created.\n\nTask ID: None..."
-    #
-    # The first two short-circuit on `if not body:` and never reach a renderer,
-    # so this file structurally cannot exercise the reads in tools/mockups.py --
-    # test_mockups.py covers those with a non-empty body missing its keys, which
-    # is the shape that actually breaks them. The third does read the body; it
-    # renders prose rather than a heading, which is a fact about the assertion's
-    # shape, not a gap in the tool.
+    expected = NOT_A_RENDERED_DOCUMENT.get(tool_name)
+    if expected is not None:
+        assert result == expected, (
+            f"{tool_name} is pinned as a tool that renders no document for an "
+            f"empty body, but it now returns:\n{result!r}\nIf it has started "
+            "rendering one, delete its entry so the general assertion below "
+            "covers it; if the wording merely changed, update the pin."
+        )
+    else:
+        # One tuple call rather than three -- PIE810. Same predicate: a heading
+        # after leading whitespace, or a readable error/confirmation prefix.
+        assert result.lstrip().startswith("#") or result.startswith(("Error:", "✓")), (
+            f"{tool_name} returned neither a rendered document nor a readable error:\n{result!r}"
+        )

@@ -11,7 +11,7 @@ Add this to `~/.codex/config.toml`:
 ```toml
 [mcp_servers.printful]
 command = "uvx"
-args = ["--from", "git+https://github.com/crichalchemist/printful-mcp@dev", "printful-mcp"]
+args = ["--from", "git+https://github.com/crichalchemist/printful-mcp@main", "printful-mcp"]
 env_vars = ["PRINTFUL_API_KEY", "PRINTFUL_STORE_ID"]
 ```
 

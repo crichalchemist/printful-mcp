@@ -6,9 +6,12 @@ this plan added. Rather than pick a number, this asserts the property the
 number was trying to express: every endpoint the core can build, the server
 can reach, through exactly one registered tool.
 
-`tool.annotations` is a `ToolAnnotations` object with attribute access, and
-`mcp.list_tools()` is a coroutine returning `list[Tool]`. Both were confirmed
-against the installed `mcp` version.
+`mcp.list_tools()` is a coroutine returning `list[Tool]`, confirmed against the
+installed `mcp` version. `tool.annotations` is a `ToolAnnotations` model, and the
+annotation assertions below read it with `model_dump(by_alias=True)` rather than
+by attribute: the SDK names the fields `destructive_hint` in Python and aliases
+them to `destructiveHint` on the wire, so an attribute read pins the SDK's
+internal spelling while a client only ever sees the alias.
 """
 
 import ast
@@ -178,7 +181,7 @@ def test_every_tool_function_is_reachable_through_exactly_one_delegate():
 def _registered_tool_names() -> list:
     """Every name passed to an @mcp.tool decorator, in source order.
 
-    Duplicates are invisible at runtime: FastMCP keeps the first registration
+    Duplicates are invisible at runtime: MCPServer keeps the first registration
     under a repeated name and rejects the second with a printed warning, not
     an exception, so `list_tools()` silently returns one tool where two were
     written. Only the source shows both.
@@ -200,7 +203,7 @@ def _registered_tool_names() -> list:
 def test_no_tool_name_is_registered_twice():
     """A repeated name loses a tool with no error anywhere.
 
-    Nine tasks appended registrations to one file. FastMCP keeps the first
+    Nine tasks appended registrations to one file. MCPServer keeps the first
     registration under a duplicate name and prints a warning for the second
     rather than raising, so the *later* tool simply stops existing -- and a
     runtime check cannot see it, because the rejected registration never
@@ -230,11 +233,16 @@ async def test_every_tool_declares_the_full_annotation_set(required):
 
     A missing destructiveHint on printful_cancel_order means a client may run
     it without confirming. That is a safety defect, not a documentation one.
+
+    These are the wire names, read off the serialized payload rather than the
+    Python attribute. The SDK spells them destructive_hint internally and only
+    aliases to camelCase on the way out, so an attribute read asserts the SDK's
+    naming convention while a client reads this.
     """
     for tool in await _tools():
         assert tool.annotations is not None, f"{tool.name} has no annotations"
-        value = getattr(tool.annotations, required, None)
-        assert value is not None, f"{tool.name} is missing {required}"
+        wire = tool.annotations.model_dump(by_alias=True)
+        assert wire.get(required) is not None, f"{tool.name} is missing {required}"
 
 
 async def test_the_tools_that_spend_money_are_marked_destructive():
@@ -246,7 +254,6 @@ async def test_the_tools_that_spend_money_are_marked_destructive():
     """
     by_name = {tool.name: tool for tool in await _tools()}
     for name in ("printful_confirm_order", "printful_cancel_order"):
-        assert by_name[name].annotations.destructiveHint is True, (
-            f"{name} is destructive and must say so"
-        )
-        assert by_name[name].annotations.readOnlyHint is False
+        wire = by_name[name].annotations.model_dump(by_alias=True)
+        assert wire["destructiveHint"] is True, f"{name} is destructive and must say so"
+        assert wire["readOnlyHint"] is False

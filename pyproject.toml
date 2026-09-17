@@ -33,10 +33,12 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-    # Upper bound is required, not cautious: mcp 2.x renamed FastMCP to
-    # MCPServer, so server.py fails at import against 2.x. Without this pin a
-    # fresh `pip install -e .` produces a server that cannot start.
-    "mcp>=0.9.0,<2",
+    # Both bounds are required, not cautious. 2.x renamed FastMCP to MCPServer
+    # and moved the HTTP host/port off `settings` onto `run()`; this server uses
+    # both, so it fails at import against 1.x and at `--transport http` against
+    # a hypothetical 3.x. Bump deliberately, with the suite green, never by
+    # widening the range.
+    "mcp>=2,<3",
     "httpx>=0.27.0",
     "pydantic>=2.0.0",
     "python-dotenv>=1.0.0",

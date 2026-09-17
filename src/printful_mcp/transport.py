@@ -1,6 +1,6 @@
 """The server's transport: one AsyncTransport, created on first use.
 
-This is deliberately not a FastMCP lifespan handler. A lifespan handler was
+This is deliberately not an MCPServer lifespan handler. A lifespan handler was
 tried here and failed, and the commits that reached this lazy-global design
 exist for that reason -- see `CLAUDE.md` in the repository root. Do not reintroduce one.
 """

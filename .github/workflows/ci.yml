@@ -53,16 +53,29 @@ jobs:
   upstream-drift:
     if: github.event_name == 'schedule'
     runs-on: ubuntu-latest
-    continue-on-error: true
+    # Deliberately NOT continue-on-error. It carried that flag while the repo
+    # was pinned to mcp<2, which made the job unable to do its only job: the
+    # upgrade always failed the import, so it failed every week forever, and
+    # continue-on-error made the RUN conclude success, so nobody was notified.
+    # A weekly red run is the announcement. If it goes red, read the import
+    # error before changing the pin.
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
-      # Install the newest mcp WITHOUT the pin and report whether the server
-      # still imports. Announces when a 2.x migration becomes worthwhile,
-      # instead of discovering it through a user's bug report.
+      # Install the newest mcp WITHOUT the pin and check the server still works.
       - run: pip install -e . && pip install --upgrade "mcp"
-      - run: python -c "import printful_mcp.server; print('imports clean')"
+      # Import is necessary but NOT sufficient, and that gap is not theoretical:
+      # the 1.x->2.x move broke `mcp.settings.host` in __main__.py, which import
+      # cannot reach. Build the HTTP app too, so a transport break fails here
+      # rather than for a user running --transport http.
+      - run: |
+          python -c "import printful_mcp.server; print('imports clean')"
+          python -c "
+          from printful_mcp.server import mcp
+          mcp.streamable_http_app()
+          print('streamable-http app builds')
+          "
 
   live:
     # The repository guard is load-bearing. Without it a fork's scheduled run

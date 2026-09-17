@@ -1,7 +1,7 @@
 {
   "name": "printful-mcp",
   "owner": {
-    "name": "Courtney Andrew Richardson"
+    "name": "Purple Horizons"
   },
   "description": "The Printful MCP server and CLI, served from the repository that builds them.",
   "plugins": [

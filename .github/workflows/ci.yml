@@ -86,7 +86,11 @@ jobs:
     # This selects the whole live suite, so TestLiveDraftOrder creates and
     # cancels a real draft order every week. Nothing is charged -- a draft is
     # not a confirmed order, and no live test reaches confirm_order.
-    if: github.event_name == 'schedule' && github.repository == 'crichalchemist/printful-mcp'
+    # This job needs PRINTFUL_API_KEY and PRINTFUL_STORE_ID as Actions secrets
+    # before its first scheduled run. Without them it fails rather than skips,
+    # by the same design that keeps the live tests from softening into no-ops --
+    # so add the secrets, or delete this job, before the first Monday.
+    if: github.event_name == 'schedule' && github.repository == 'Purple-Horizons/printful-mcp'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

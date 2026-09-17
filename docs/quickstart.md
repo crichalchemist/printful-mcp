@@ -19,7 +19,7 @@ Full detail, including security notes: [api-token-setup.md](api-token-setup.md).
 ## 2. Install
 
 ```bash
-git clone https://github.com/crichalchemist/printful-mcp.git
+git clone https://github.com/Purple-Horizons/printful-mcp.git
 cd printful-mcp
 python -m venv .venv
 .venv/bin/pip install -e ".[dev]"

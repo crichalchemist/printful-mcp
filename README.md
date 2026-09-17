@@ -29,14 +29,7 @@ Connect Printful's API to Claude, Cursor, Codex and other MCP clients — and to
 
 </div>
 
-## About this fork
-
-This is a fork of [**Purple-Horizons/printful-mcp**](https://github.com/Purple-Horizons/printful-mcp)
-by [Purple Horizons](https://purplehorizons.io) / [Gianni D'Alerta](https://giannidalerta.com),
-kept under the same [MIT License](LICENSE). The original is the reason this exists and the
-attribution above is deliberate.
-
-What this fork changes:
+## What's inside
 
 - **One shared core.** The MCP server and the CLI were two codebases with two HTTP clients, two
   error parsers and two paginators. They now sit on `src/printful_core/`, so a fix lands once.
@@ -46,9 +39,6 @@ What this fork changes:
   and its `--help` output, and most were run before being written down. The ones that call the
   live Printful API, charge the account, or need an interactive host are **marked in place**
   rather than run — look for *not run here* beside them.
-
-Install instructions below point at this fork, because that is where this code lives. Changes
-worth having are offered upstream.
 
 ---
 
@@ -66,7 +56,7 @@ This repository is both a plugin and the marketplace that serves it
 (`.claude-plugin/marketplace.json`, `.claude-plugin/plugin.json`). Inside Claude Code:
 
 ```text
-/plugin marketplace add crichalchemist/printful-mcp
+/plugin marketplace add Purple-Horizons/printful-mcp
 /plugin install printful-mcp@printful-mcp
 ```
 
@@ -88,7 +78,7 @@ own project, or use it as the shape of an entry in your client's config:
       "command": "uvx",
       "args": [
         "--from",
-        "git+https://github.com/crichalchemist/printful-mcp@main",
+        "git+https://github.com/Purple-Horizons/printful-mcp@main",
         "printful-mcp"
       ],
       "env": {
@@ -113,7 +103,7 @@ own project, or use it as the shape of an entry in your client's config:
 The path with no resolver between you and the code:
 
 ```bash
-git clone https://github.com/crichalchemist/printful-mcp.git
+git clone https://github.com/Purple-Horizons/printful-mcp.git
 cd printful-mcp
 python -m venv .venv
 .venv/bin/pip install -e ".[dev]"
@@ -157,7 +147,7 @@ Codex has no `${VAR}` expansion, so name the variables instead of interpolating 
 ```toml
 [mcp_servers.printful]
 command = "uvx"
-args = ["--from", "git+https://github.com/crichalchemist/printful-mcp@main", "printful-mcp"]
+args = ["--from", "git+https://github.com/Purple-Horizons/printful-mcp@main", "printful-mcp"]
 env_vars = ["PRINTFUL_API_KEY", "PRINTFUL_STORE_ID"]
 ```
 
@@ -626,8 +616,7 @@ Tests live beside the code they test, in `src/*/tests/`.
 ## Contributing
 
 Issues and pull requests are welcome on
-[this fork](https://github.com/crichalchemist/printful-mcp/issues). Changes that belong
-upstream are offered to [Purple-Horizons/printful-mcp](https://github.com/Purple-Horizons/printful-mcp).
+[the issue tracker](https://github.com/Purple-Horizons/printful-mcp/issues).
 
 Before opening a pull request:
 

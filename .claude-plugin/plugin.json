@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Printful API for agents: an MCP server with 32 tools and a CLI, on one shared core.",
   "author": {
-    "name": "Courtney Andrew Richardson"
+    "name": "Purple Horizons"
   },
   "license": "MIT",
   "keywords": [

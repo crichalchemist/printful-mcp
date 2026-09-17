@@ -40,7 +40,7 @@ are safe to run.
 This package is not published to PyPI. Clone the repository and install it:
 
 ```bash
-git clone https://github.com/crichalchemist/printful-mcp.git
+git clone https://github.com/Purple-Horizons/printful-mcp.git
 cd printful-mcp
 python -m venv .venv
 .venv/bin/pip install -e ".[dev]"

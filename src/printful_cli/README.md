@@ -29,7 +29,7 @@ generate a new one.
 ## Installation
 
 ```bash
-git clone https://github.com/crichalchemist/printful-mcp.git
+git clone https://github.com/Purple-Horizons/printful-mcp.git
 cd printful-mcp
 python -m venv .venv
 .venv/bin/pip install -e ".[dev]"

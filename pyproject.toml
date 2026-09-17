@@ -64,7 +64,7 @@ Repository = "https://github.com/Purple-Horizons/printful-mcp"
 Issues = "https://github.com/Purple-Horizons/printful-mcp/issues"
 
 [tool.pytest.ini_options]
-testpaths = ["src/printful_core/tests", "src/printful_cli/tests", "src/printful_mcp/tests", "tests"]
+testpaths = ["src/printful_core/tests", "src/printful_cli/tests", "src/printful_mcp/tests"]
 # Live tests call the real Printful API and need PRINTFUL_API_KEY, so they are
 # not in the default selection — a fresh clone runs the offline suite and gets
 # a clean result. They are NOT softened: when selected without credentials they

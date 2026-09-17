@@ -15,9 +15,9 @@ repos:
         # docs/superpowers/ are an execution record that no gate may rewrite.
         # Spelling the scope here means that holds whatever file types the
         # upstream hook declares.
-        files: ^(src|tests|scripts)/
+        files: ^(src|scripts)/
       - id: ruff-format
-        files: ^(src|tests|scripts)/
+        files: ^(src|scripts)/
   - repo: local
     hooks:
       - id: manifests

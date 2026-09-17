@@ -4,7 +4,14 @@ import os
 import sys
 
 from dotenv import load_dotenv
-from mcp.server.mcpserver import MCPServer
+
+# The one API difference that cannot be feature-detected at call time: mcp 2.x
+# renamed FastMCP to MCPServer and moved it to a new module, so 1.x has no
+# mcp.server.mcpserver at all. Both legs are exercised by CI's mcp matrix.
+try:  # mcp 2.x
+    from mcp.server.mcpserver import MCPServer as ServerClass
+except ImportError:  # mcp 1.x
+    from mcp.server.fastmcp import FastMCP as ServerClass
 
 from .models.inputs import (
     AddFileInput,
@@ -45,7 +52,7 @@ from .transport import get_transport
 load_dotenv()
 
 # Initialize MCP server
-mcp = MCPServer("printful_mcp")
+mcp = ServerClass("printful_mcp")
 
 
 # ========== CATALOG TOOLS ==========

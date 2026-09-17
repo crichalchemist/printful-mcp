@@ -8,16 +8,36 @@ on:
 
 jobs:
   test:
+    # Six legs, not three. The server supports both mcp majors by
+    # feature-detecting two API moves, and a compat branch that no job runs is
+    # strictly worse than no compat branch: the 1.x -> 2.x break this code now
+    # handles survived 429 passing tests precisely by living in a branch
+    # nothing executed. Pinning one SDK here would rebuild that blind spot.
+    name: test (py${{ matrix.python-version }}, mcp ${{ matrix.mcp.major }}.x)
     runs-on: ubuntu-latest
     strategy:
+      # Both SDK legs report. Without this, the first failure hides whether the
+      # other major is also broken -- which is the one thing this matrix exists
+      # to tell us.
+      fail-fast: false
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
+        mcp:
+          # 1.7 is the floor, measured: 1.6.0's @tool decorator rejects
+          # `annotations=` and all 32 tools pass it.
+          - { major: "1", spec: "mcp>=1.7,<2" }
+          - { major: "2", spec: "mcp>=2,<3" }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
       - run: pip install -e ".[dev]"
+      # Resolve the SDK major for this leg. The project range admits both, so
+      # this narrows rather than conflicts.
+      - run: pip install "${{ matrix.mcp.spec }}"
+      - name: Show which SDK this leg actually resolved
+        run: python -c "import importlib.metadata as m; print('mcp', m.version('mcp'))"
       # The lint scope is the test boundary: pyproject's `testpaths` runs
       # src/ and tests/, and scripts/ holds the checker the manifests job
       # calls. docs/ is deliberately not an argument -- ruff formats Python

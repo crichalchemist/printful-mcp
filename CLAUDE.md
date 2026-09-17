@@ -222,19 +222,33 @@ request; it is needed for account-level (multi-store) tokens. Separately, `store
 registered with `atexit`. **Do not reintroduce an MCPServer lifespan handler** for transport
 setup or teardown — one was tried, it failed, and this design is what replaced it.
 
-### The SDK pin has two bounds, and both are load-bearing
+### The server runs on both mcp majors, and CI proves both
 
-`mcp>=2,<3`. The server imports `MCPServer` from `mcp.server.mcpserver`; that module does not
-exist in mcp 1.x, which called the class `FastMCP`. A 1.x install fails at import.
+`mcp>=1.7,<3`. Two things moved between 1.x and 2.x, and the code feature-detects each:
 
-**The upper bound guards a subtler break.** HTTP host and port are `run()` keywords —
-`mcp.run(transport="streamable-http", host=..., port=...)`. mcp 1.x instead carried them on
-`mcp.settings`, and 2.x's `Settings` has no such fields, so the old form raises `ValueError`.
-That break is reachable **only** through `--transport http` or `--transport sse`: the module
-imports clean, the server boots clean, and a boot check sees nothing. This is why
-`src/printful_mcp/tests/test_entrypoint.py` asserts the kwargs `__main__.py` hands `run()`
-rather than merely that it does not raise, and why the `upstream-drift` CI job builds
-`streamable_http_app()` instead of stopping at an import.
+| | mcp 1.x | mcp 2.x |
+|---|---|---|
+| class | `FastMCP`, in `mcp.server.fastmcp` | `MCPServer`, in `mcp.server.mcpserver` |
+| HTTP host/port | on `mcp.settings` | `run()` keywords |
+
+**Each SDK rejects the other's form**, so neither can simply be the default: 2.x raises
+`ValueError` on `mcp.settings.host = ...` (the field is gone), and 1.x raises `TypeError` on
+`run(..., host=...)` (its `run()` has no `**kwargs`). `server.py` resolves the class with
+`try`/`except ImportError`; `__main__.py` branches on `hasattr(mcp.settings, "host")` —
+**detect the attribute, never sniff a version string.**
+
+**The floor is 1.7 and it is measured, not estimated.** 1.6.0's `@tool` decorator rejects
+`annotations=`, and all 32 tools pass it. This project shipped `mcp>=0.9.0` for a year; that
+was not a cautious lower bound, it was false.
+
+**Why the CI test matrix has six legs rather than three.** A compat branch that no job runs
+is worse than no compat branch. The 1.x→2.x host/port break is reachable **only** through
+`--transport http` or `--transport sse` — the module imports clean, the server boots clean,
+and it survived 429 passing tests by living in a branch nothing executed. Pinning one SDK in
+CI would rebuild exactly that blind spot. For the same reason
+`src/printful_mcp/tests/test_entrypoint.py` asserts the address the SDK *received* rather
+than the absence of an exception, and pins which route the branch took; and `upstream-drift`
+builds `streamable_http_app()` instead of stopping at an import.
 
 **Read annotation fields by their wire names.** `ToolAnnotations` spells them
 `destructive_hint` in Python and aliases to `destructiveHint` on the wire. Assert against

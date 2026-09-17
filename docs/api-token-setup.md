@@ -120,7 +120,7 @@ the scope withheld, which nothing here performs.
 
 The catalog, geography, shipping-rate and tax tools do not read store-owned data, so none
 of the scopes above is written for them. They are not listed here one by one on purpose:
-**`API_SCOPES_REFERENCE.md` carries the complete tool→endpoint map for all 32 registered
+**`docs/api-scopes-reference.md` carries the complete tool→endpoint map for all 32 registered
 tools**, derived from the `@mcp.tool` registrations in `src/printful_mcp/server.py` and
 the request builders in `src/printful_core/endpoints/`. Keep that map current when a tool
 is added; this document describes what each scope buys, not the full roster.

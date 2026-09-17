@@ -1,7 +1,7 @@
 # Quick Start
 
 One path, start to finish. For the other install options — Claude Code plugin, `uvx` with no
-clone, Codex — see [README.md](README.md#install).
+clone, Codex — see [README.md](../README.md#install).
 
 ## 1. Get an API token
 
@@ -14,7 +14,7 @@ clone, Codex — see [README.md](README.md#install).
 3. Choose access level **Account (all stores)** for the most flexibility. An account-level token
    needs `PRINTFUL_STORE_ID` set as well — store-scoped calls are rejected without it.
 
-Full detail, including security notes: [API_TOKEN_SETUP.md](API_TOKEN_SETUP.md).
+Full detail, including security notes: [api-token-setup.md](api-token-setup.md).
 
 ## 2. Install
 
@@ -127,4 +127,4 @@ and deliberately does not retry, because a silent retry against the mockup endpo
 causes Printful's 60-second lockout. New stores are limited to 2 mockup requests per 60
 seconds.
 
-More, including the tool list and the testing traps: [README.md](README.md).
+More, including the tool list and the testing traps: [README.md](../README.md).

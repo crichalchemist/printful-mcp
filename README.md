@@ -6,7 +6,7 @@
 
 Connect Printful's API to Claude, Cursor, Codex and other MCP clients — and to your terminal.
 
-[**Install**](#install) • [**Configure**](#configuration) • [**Tools**](#the-32-mcp-tools) • [**CLI**](#the-cli) • [**Quick start**](QUICKSTART.md)
+[**Install**](#install) • [**Configure**](#configuration) • [**Tools**](#the-32-mcp-tools) • [**CLI**](#the-cli) • [**Quick start**](docs/quickstart.md)
 
 ---
 
@@ -58,7 +58,7 @@ worth having are offered upstream.
 
 - **Python 3.10+** ([download](https://www.python.org/downloads/))
 - **A Printful API token** ([get one](https://www.printful.com/dashboard/api)) — see
-  [API_TOKEN_SETUP.md](API_TOKEN_SETUP.md) for scopes
+  [docs/api-token-setup.md](docs/api-token-setup.md) for scopes
 
 ### Option 1 — Claude Code plugin
 
@@ -146,7 +146,7 @@ single most common reason a working install does not start under an MCP client:
 
 For Cursor that file is `~/.cursor/mcp.json`; for Claude Desktop it is
 `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS.
-`cursor-mcp-config.json` in this repository is that same entry as a file you can copy: fill in
+`.cursor/cursor-mcp-config.json` in this repository is that same entry as a file you can copy: fill in
 the absolute path to your checkout and your key.
 
 ### Option 4 — Codex
@@ -502,7 +502,7 @@ operations.
 <summary><b>"This endpoint requires 'store_id'!"</b></summary>
 
 Your token is account-level. Export `PRINTFUL_STORE_ID` (or pass `--store-id`) so the
-`X-PF-Store-Id` header is sent. See [API_SCOPES_REFERENCE.md](API_SCOPES_REFERENCE.md).
+`X-PF-Store-Id` header is sent. See [docs/api-scopes-reference.md](docs/api-scopes-reference.md).
 
 </details>
 
@@ -564,8 +564,8 @@ mv .env .env.aside && .venv/bin/python -m pytest -q; mv .env.aside .env
 Note the `;` before the restore, so `.env` comes back even when the suite fails.
 
 **Do not pass a directory path to run "the suite."** A path argument overrides `testpaths`, so
-`pytest tests/` collects a handful of cases, reports them as passing, and runs none of the MCP
-adapter tests. A path to a single file is fine when you mean it.
+`pytest src/printful_mcp/tests` collects 142 of the suite's 434 cases, reports them all passing,
+and runs nothing from the core or the CLI. A path to a single file is fine when you mean it.
 
 Live tests are excluded from the default selection by `addopts = "-m 'not live'"` so a fresh
 clone gets a clean result. They are not softened: selected without credentials they fail loudly
@@ -577,7 +577,7 @@ For an interactive tool browser:
 
 ```bash
 export PRINTFUL_API_KEY=your-key
-./test-with-inspector.sh          # npx @modelcontextprotocol/inspector, UI on :5173
+./scripts/test-with-inspector.sh  # npx @modelcontextprotocol/inspector, UI on :5173
 ```
 
 *Not run here — it launches an interactive browser UI.* Note that the script spawns a bare
@@ -633,15 +633,15 @@ Before opening a pull request:
 
 ```bash
 .venv/bin/python -m pytest
-.venv/bin/python -m ruff check src/ tests/ scripts/
-.venv/bin/python -m ruff format --check src/ tests/ scripts/
+.venv/bin/python -m ruff check src/ scripts/
+.venv/bin/python -m ruff format --check src/ scripts/
 ```
 
-That is the scope CI runs, and it is the test boundary: `testpaths` covers `src/` and `tests/`,
-and `scripts/` holds the manifest checker. All three are clean.
+That is the scope CI runs, and it is the test boundary: every `testpaths` entry lives under
+`src/`, and `scripts/` holds the manifest checker. Both are clean.
 
-**The repository-wide form is not a stricter version of it.** `ruff format --check .` walks 95
-files to the gate's 80, and all fifteen extras are Markdown — ruff formats Python inside fenced
+**The repository-wide form is not a stricter version of it.** `ruff format --check .` walks 96
+files to the gate's 81, and all fifteen extras are Markdown — ruff formats Python inside fenced
 code blocks. Four sit under `docs/superpowers/`, which is the execution record of earlier plans;
 ruff would rewrite three of them, and no gate may touch them. The other eleven are **not covered
 by any gate** — unguarded rather than deliberately excluded. So run the scoped commands above,
@@ -666,8 +666,9 @@ missed one.
 | Purple Horizons | [purplehorizons.io](https://purplehorizons.io) |
 | Gianni D'Alerta | [giannidalerta.com](https://giannidalerta.com) |
 
-Also in this repository: [QUICKSTART.md](QUICKSTART.md),
-[API_TOKEN_SETUP.md](API_TOKEN_SETUP.md), [API_SCOPES_REFERENCE.md](API_SCOPES_REFERENCE.md),
+Also in this repository: [docs/quickstart.md](docs/quickstart.md),
+[docs/api-token-setup.md](docs/api-token-setup.md),
+[docs/api-scopes-reference.md](docs/api-scopes-reference.md),
 [CLAUDE.md](CLAUDE.md).
 
 ---

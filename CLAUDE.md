@@ -46,9 +46,9 @@ It is not; the interpreter is wrong. Note also that `source .venv/bin/activate` 
 between an agent's tool calls, so the explicit path is the correct form regardless.
 
 **Do not pass a directory path to run "the suite."** An explicit path argument overrides
-`testpaths`, so `pytest tests/` collects three cases out of the whole suite, reports
-`3 passed`, and runs none of the MCP adapter tests. (A path to one file, as in the line above,
-is fine — that's running one file on purpose, not standing in for the suite.)
+`testpaths`, so `pytest src/printful_mcp/tests` collects 142 of the suite's 434 cases, reports
+them all passing, and runs nothing from the core or the CLI. (A path to one file, as in the
+line above, is fine — that's running one file on purpose, not standing in for the suite.)
 
 - **The offline suite must pass with `PRINTFUL_API_KEY` and `PRINTFUL_STORE_ID` unset.** If a
   test needs credentials, it is a live test and belongs behind the marker.
@@ -75,21 +75,25 @@ is fine — that's running one file on purpose, not standing in for the suite.)
 ### Lint
 
 ```bash
-.venv/bin/ruff check src/ tests/ scripts/            # lint
-.venv/bin/ruff format --check src/ tests/ scripts/   # formatting, non-mutating
-.venv/bin/ruff format src/ tests/ scripts/           # formatting, applied
+.venv/bin/ruff check src/ scripts/            # lint
+.venv/bin/ruff format --check src/ scripts/   # formatting, non-mutating
+.venv/bin/ruff format src/ scripts/           # formatting, applied
 ```
 
 Both gates must be clean before a commit. The selected rules and the 100-column line length
 live in `pyproject.toml` under `[tool.ruff]` — change them there, not with per-file ignores.
 
 **That scope is the test boundary, and both narrowing and widening it have already caused
-bugs.** `testpaths` runs `src/` and `tests/`, and `scripts/` holds `check_manifests.py`;
-`.github/workflows/ci.yml` and `.pre-commit-config.yaml` use exactly this scope. Linting only
-`src/` is how `tests/test_create_order.py` sat inside the default suite with two ruff findings
-and nothing checking it. Widening to `.` is not the fix: ruff formats Python inside Markdown
-fences, and the plan documents under `docs/superpowers/` are an execution record that no gate
-may rewrite.
+bugs.** Every path in `testpaths` lives under `src/`, and `scripts/` holds
+`check_manifests.py`; `.github/workflows/ci.yml` and `.pre-commit-config.yaml` use exactly
+this scope. It used to include a root `tests/` too, and the reason it no longer does is worth
+keeping: that directory held exactly one file, `test_create_order.py`, which tested
+`printful_mcp` code. While the gate was `src/` alone, that file sat inside the default suite
+with two ruff findings and nothing checking it. It now lives in `src/printful_mcp/tests/`
+with its siblings, so **a new test cannot land outside the lint scope without also landing
+outside `testpaths`** — the two can no longer drift apart. Widening to `.` is not the fix:
+ruff formats Python inside Markdown fences, and the plan documents under `docs/superpowers/`
+are an execution record that no gate may rewrite.
 
 **CI runs these for you; the pre-commit hook does not install itself.**
 `.github/workflows/ci.yml` runs both ruff gates and the offline suite on Python 3.10, 3.11 and
@@ -262,6 +266,7 @@ Match the dominant pattern in new code; leave these as they are unless the task 
   entry in the same commit.
 - `src/printful_cli/skills/SKILL.md` — the same thing for the CLI surface: command groups,
   agent rules, and the guards on billable operations.
-- `API_TOKEN_SETUP.md` / `API_SCOPES_REFERENCE.md` — which token scopes each tool group needs.
+- `docs/api-token-setup.md` / `docs/api-scopes-reference.md` — which token scopes each tool
+  group needs.
 - `docs/superpowers/specs/` and `docs/superpowers/plans/` — the design and execution record for
   the core extraction and the MCP rebuild.

@@ -28,7 +28,7 @@ PRINTFUL_API_KEY = "your-token"
 you name the variable in `env_vars` or give a literal in `env`.
 
 `PRINTFUL_STORE_ID` is optional and only needed for an account-level
-(multi-store) token — see `API_TOKEN_SETUP.md`.
+(multi-store) token — see `docs/api-token-setup.md`.
 
 Source: <https://developers.openai.com/codex/mcp>
 
@@ -64,4 +64,4 @@ Source: <https://developers.openai.com/codex/plugins/build>
 ## Path 3 — no plugin at all
 
 The server is an ordinary Python console script. `pip install -e .` in a clone,
-export `PRINTFUL_API_KEY`, and run `printful-mcp`. See `QUICKSTART.md`.
+export `PRINTFUL_API_KEY`, and run `printful-mcp`. See `docs/quickstart.md`.

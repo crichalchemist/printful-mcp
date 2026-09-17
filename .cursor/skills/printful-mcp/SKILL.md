@@ -574,9 +574,9 @@ both into one readable message.
 ## Additional Resources
 
 For detailed documentation:
-- [README.md](../../../README.md) - Full setup and usage guide
-- [QUICKSTART.md](../../../QUICKSTART.md) - 3-minute setup
-- [API_TOKEN_SETUP.md](../../../API_TOKEN_SETUP.md) - API key configuration
+- `README.md` - Full setup and usage guide
+- `docs/quickstart.md` - 3-minute setup
+- `docs/api-token-setup.md` - API key configuration
 
 For support:
 - GitHub Issues: Report bugs or request features

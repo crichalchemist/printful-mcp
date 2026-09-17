@@ -4,7 +4,7 @@
       "command": "uvx",
       "args": [
         "--from",
-        "git+https://github.com/crichalchemist/printful-mcp@dev",
+        "git+https://github.com/crichalchemist/printful-mcp@main",
         "printful-mcp"
       ],
       "env": {

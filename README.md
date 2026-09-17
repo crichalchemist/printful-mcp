@@ -88,7 +88,7 @@ own project, or use it as the shape of an entry in your client's config:
       "command": "uvx",
       "args": [
         "--from",
-        "git+https://github.com/crichalchemist/printful-mcp@dev",
+        "git+https://github.com/crichalchemist/printful-mcp@main",
         "printful-mcp"
       ],
       "env": {
@@ -101,9 +101,10 @@ own project, or use it as the shape of an entry in your client's config:
 
 **Two things to know about that ref, both true today:**
 
-- It pins `@dev`, a **moving branch**, not a release tag — you get whatever is on `origin/dev`
-  at the moment `uvx` resolves it, which is not necessarily what you see in this working tree.
-  It becomes `@main` once the open pull request merges.
+- It pins `@main`, a **moving branch**, not a release tag — you get whatever is on
+  `origin/main` at the moment `uvx` resolves it, which is not necessarily what you see in this
+  working tree. For a build that cannot shift under you, pin a commit: replace `@main` with
+  `@<sha>`.
 - `${PRINTFUL_API_KEY}` is **Claude Code's** expansion syntax. Codex does not expand it — use
   the Codex section below instead.
 
@@ -156,7 +157,7 @@ Codex has no `${VAR}` expansion, so name the variables instead of interpolating 
 ```toml
 [mcp_servers.printful]
 command = "uvx"
-args = ["--from", "git+https://github.com/crichalchemist/printful-mcp@dev", "printful-mcp"]
+args = ["--from", "git+https://github.com/crichalchemist/printful-mcp@main", "printful-mcp"]
 env_vars = ["PRINTFUL_API_KEY", "PRINTFUL_STORE_ID"]
 ```
 

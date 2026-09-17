@@ -6,9 +6,10 @@ This file provides guidance when working with code in this repository.
 
 ```bash
 .venv/bin/pip install -e ".[dev]"  # install with pytest + ruff
+uv pip install -e ".[dev]" --python .venv/bin/python   # same, if the venv has no pip
 .venv/bin/python -m printful_mcp   # MCP server, stdio transport (default)
 .venv/bin/python -m printful_mcp --transport http --port 8000   # streamable-http on /mcp
-.venv/bin/printful-mcp             # same server, via the installed console script
+.venv/bin/printful-mcp --transport http --port 8000   # identical; the console script takes the same flags
 .venv/bin/printful --help          # the CLI surface (src/printful_cli/)
 npx @modelcontextprotocol/inspector .venv/bin/python -m printful_mcp   # interactive tool UI
 ```
@@ -20,6 +21,15 @@ reason a working install does not start.
 
 `PRINTFUL_API_KEY` must be set (via `.env` or environment) or `__main__.main()` exits 1
 before the server starts.
+
+**`[project.scripts]` points `printful-mcp` at `__main__:main`, and that is load-bearing.** It
+named `server:main` for a year — a function that ignored `sys.argv`, so the console script
+silently dropped every flag. From a clone nobody notices, because `python -m` is right there;
+but a `uv tool install` or `uvx` user gets *only* the console script, and for them
+`--transport http` started a stdio server and `--help` printed the missing-key error.
+`src/printful_mcp/tests/test_entrypoint.py` now asserts the installed entry point resolves to
+the argparse `main`, and it reads that from the **installed metadata** — so after editing
+`[project.scripts]`, reinstall or the test is checking the old target.
 
 ### Tests
 
@@ -46,7 +56,7 @@ It is not; the interpreter is wrong. Note also that `source .venv/bin/activate` 
 between an agent's tool calls, so the explicit path is the correct form regardless.
 
 **Do not pass a directory path to run "the suite."** An explicit path argument overrides
-`testpaths`, so `pytest src/printful_mcp/tests` collects 142 of the suite's 434 cases, reports
+`testpaths`, so `pytest src/printful_mcp/tests` collects 145 of the suite's 437 cases, reports
 them all passing, and runs nothing from the core or the CLI. (A path to one file, as in the
 line above, is fine — that's running one file on purpose, not standing in for the suite.)
 

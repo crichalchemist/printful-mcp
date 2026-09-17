@@ -13,6 +13,7 @@ socket is ever bound and no port is held.
 """
 
 import sys
+from importlib.metadata import entry_points
 from unittest.mock import patch
 
 import pytest
@@ -98,3 +99,27 @@ def test_a_missing_api_key_exits_rather_than_starting_a_server():
     ):
         entrypoint.main()
     assert exc.value.code == 1
+
+
+def test_the_installed_executable_parses_flags_rather_than_ignoring_them():
+    """A `uv tool install` or `uvx` user only ever gets the console script.
+
+    There is no `python -m` on that path, so whatever `[project.scripts]` names
+    is the entire command-line surface. It pointed at `server:main` for a year,
+    which ignored `sys.argv` outright: `printful-mcp --transport http` started a
+    stdio server and `printful-mcp --help` printed the missing-key error. Both
+    failures are invisible from inside a checkout, where `python -m` works.
+    """
+    installed = [e for e in entry_points(group="console_scripts") if e.name == "printful-mcp"]
+    assert installed, "no printful-mcp console script installed -- do an editable install first"
+    (script,) = installed
+    # The string is checked before the import so this fails by assertion rather
+    # than by AttributeError: entry points come from the INSTALLED metadata, so
+    # editing [project.scripts] without reinstalling leaves the old target here,
+    # and the reader needs to be told that rather than shown a traceback.
+    assert script.value == "printful_mcp.__main__:main", (
+        f"the console script resolves to {script.value}, which cannot parse --transport. "
+        "If you just edited [project.scripts], reinstall -- entry points are read from the "
+        "installed metadata, not from pyproject.toml."
+    )
+    assert script.load() is entrypoint.main

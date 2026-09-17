@@ -21,8 +21,7 @@ jobs:
       # The lint scope is the test boundary: every path in pyproject's
       # `testpaths` lives under src/, and scripts/ holds the checker the
       # manifests job calls. docs/ is deliberately not an argument -- ruff
-      # formats Python inside Markdown, and the historical plan documents
-      # under docs/superpowers/ are an execution record, not source.
+      # formats Python inside Markdown, and those files are prose, not source.
       - run: ruff check src/ scripts/
       - run: ruff format --check src/ scripts/
       # No credentials, and none needed: the offline suite must pass without

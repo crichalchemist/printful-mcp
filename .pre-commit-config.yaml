@@ -11,8 +11,8 @@ repos:
       - id: ruff-check
         args: [--fix]
         # The same scope the CI lint gate uses, and the reason is the same:
-        # ruff formats Python inside Markdown, and the plan documents under
-        # docs/superpowers/ are an execution record that no gate may rewrite.
+        # ruff formats Python inside Markdown, and the documentation outside
+        # this scope is prose that no gate should rewrite.
         # Spelling the scope here means that holds whatever file types the
         # upstream hook declares.
         files: ^(src|scripts)/

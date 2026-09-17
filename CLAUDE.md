@@ -92,8 +92,8 @@ keeping: that directory held exactly one file, `test_create_order.py`, which tes
 with two ruff findings and nothing checking it. It now lives in `src/printful_mcp/tests/`
 with its siblings, so **a new test cannot land outside the lint scope without also landing
 outside `testpaths`** — the two can no longer drift apart. Widening to `.` is not the fix:
-ruff formats Python inside Markdown fences, and the plan documents under `docs/superpowers/`
-are an execution record that no gate may rewrite.
+ruff formats Python inside Markdown fences, so it would rewrite eleven prose files to satisfy
+a Python formatter.
 
 **CI runs these for you; the pre-commit hook does not install itself.**
 `.github/workflows/ci.yml` runs both ruff gates and the offline suite on Python 3.10, 3.11 and
@@ -268,5 +268,3 @@ Match the dominant pattern in new code; leave these as they are unless the task 
   agent rules, and the guards on billable operations.
 - `docs/api-token-setup.md` / `docs/api-scopes-reference.md` — which token scopes each tool
   group needs.
-- `docs/superpowers/specs/` and `docs/superpowers/plans/` — the design and execution record for
-  the core extraction and the MCP rebuild.

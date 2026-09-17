@@ -629,13 +629,11 @@ Before opening a pull request:
 That is the scope CI runs, and it is the test boundary: every `testpaths` entry lives under
 `src/`, and `scripts/` holds the manifest checker. Both are clean.
 
-**The repository-wide form is not a stricter version of it.** `ruff format --check .` walks 96
-files to the gate's 81, and all fifteen extras are Markdown — ruff formats Python inside fenced
-code blocks. Four sit under `docs/superpowers/`, which is the execution record of earlier plans;
-ruff would rewrite three of them, and no gate may touch them. The other eleven are **not covered
-by any gate** — unguarded rather than deliberately excluded. So run the scoped commands above,
-treat a repository-wide finding as out of scope for your change, and do not fix one in an
-unrelated pull request.
+**The repository-wide form is not a stricter version of it.** `ruff format --check .` walks 92
+files to the gate's 81, and all eleven extras are Markdown — ruff formats Python inside fenced
+code blocks. They are **not covered by any gate**: unguarded rather than deliberately excluded.
+So run the scoped commands above, treat a repository-wide finding as out of scope for your
+change, and do not fix one in an unrelated pull request.
 
 Adding an MCP tool means touching three files, in this order: `models/inputs.py`,
 `tools/<domain>.py`, then a delegate in `server.py`. The parity test will tell you if you

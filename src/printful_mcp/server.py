@@ -4,7 +4,7 @@ import os
 import sys
 
 from dotenv import load_dotenv
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from .models.inputs import (
     AddFileInput,
@@ -45,7 +45,7 @@ from .transport import get_transport
 load_dotenv()
 
 # Initialize MCP server
-mcp = FastMCP("printful_mcp")
+mcp = MCPServer("printful_mcp")
 
 
 # ========== CATALOG TOOLS ==========

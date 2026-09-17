@@ -219,8 +219,27 @@ request; it is needed for account-level (multi-store) tokens. Separately, `store
 ### Transport lifecycle
 
 `src/printful_mcp/transport.py` holds a lazily-initialized module global (`get_transport()`)
-registered with `atexit`. **Do not reintroduce a FastMCP lifespan handler** for transport
+registered with `atexit`. **Do not reintroduce an MCPServer lifespan handler** for transport
 setup or teardown — one was tried, it failed, and this design is what replaced it.
+
+### The SDK pin has two bounds, and both are load-bearing
+
+`mcp>=2,<3`. The server imports `MCPServer` from `mcp.server.mcpserver`; that module does not
+exist in mcp 1.x, which called the class `FastMCP`. A 1.x install fails at import.
+
+**The upper bound guards a subtler break.** HTTP host and port are `run()` keywords —
+`mcp.run(transport="streamable-http", host=..., port=...)`. mcp 1.x instead carried them on
+`mcp.settings`, and 2.x's `Settings` has no such fields, so the old form raises `ValueError`.
+That break is reachable **only** through `--transport http` or `--transport sse`: the module
+imports clean, the server boots clean, and a boot check sees nothing. This is why
+`src/printful_mcp/tests/test_entrypoint.py` asserts the kwargs `__main__.py` hands `run()`
+rather than merely that it does not raise, and why the `upstream-drift` CI job builds
+`streamable_http_app()` instead of stopping at an import.
+
+**Read annotation fields by their wire names.** `ToolAnnotations` spells them
+`destructive_hint` in Python and aliases to `destructiveHint` on the wire. Assert against
+`annotations.model_dump(by_alias=True)`; an attribute read pins the SDK's internal naming,
+which changed between 1.x and 2.x while the wire contract did not.
 
 ## Known inconsistencies
 

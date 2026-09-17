@@ -36,22 +36,22 @@ def main():
         print("Get your API key from: https://www.printful.com/dashboard/api", file=sys.stderr)
         sys.exit(1)
 
-    # Configure HTTP settings by modifying mcp.settings directly
     if args.transport in ("http", "sse"):
-        mcp.settings.host = args.host
-        mcp.settings.port = args.port
         print(
             f"Starting {args.transport.upper()} server on http://{args.host}:{args.port}",
             file=sys.stderr,
         )
 
-    # Run the server with selected transport
+    # host and port are run() keywords, not settings. mcp 1.x carried them on
+    # `mcp.settings`; 2.x's Settings has no such fields and assigning one raises
+    # ValueError -- which would surface only when a user passed --transport http,
+    # not at import, so no boot check can catch it.
     if args.transport == "stdio":
         mcp.run(transport="stdio")
     elif args.transport == "http":
-        mcp.run(transport="streamable-http")
+        mcp.run(transport="streamable-http", host=args.host, port=args.port)
     elif args.transport == "sse":
-        mcp.run(transport="sse")
+        mcp.run(transport="sse", host=args.host, port=args.port)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,1 @@
+../../src/printful_cli/skills/SKILL.md

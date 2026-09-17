@@ -1,197 +1,266 @@
-"""Order tools for Printful MCP server."""
+"""Order tools for the Printful MCP server."""
 
 import json
-from typing import Dict, Any
-from ..client import PrintfulClient, PrintfulAPIError
+
+from printful_core import polling
+from printful_core.endpoints import orders
+from printful_core.errors import PrintfulError
+from printful_core.format import markdown
+from printful_core.transport import AsyncTransport
+
 from ..models.inputs import (
-    CreateOrderInput,
-    GetOrderInput,
+    CancelOrderInput,
     ConfirmOrderInput,
+    CreateEstimationTaskInput,
+    CreateOrderInput,
+    GetEstimationTaskInput,
+    GetOrderInput,
+    ListOrderItemsInput,
+    ListOrderShipmentsInput,
     ListOrdersInput,
+    UpdateOrderInput,
+)
+
+PLACEMENTS_HINT = (
+    'Add placements, e.g. [{"placement":"front","technique":"dtg",'
+    '"layers":[{"type":"file","url":"https://example.com/art.png"}]}]'
 )
 
 
-def format_order_markdown(order: Dict[str, Any]) -> str:
-    """Format order data as markdown."""
-    lines = [
-        f"# Order {order['id']}",
-        f"",
-        f"**Status:** {order['status']}",
-        f"**External ID:** {order.get('external_id', 'N/A')}",
-        f"**Created:** {order['created_at']}",
-        f"**Updated:** {order['updated_at']}",
-        f"",
-    ]
-    
-    # Recipient
-    if order.get('recipient'):
-        recipient = order['recipient']
-        lines.extend([
-            "## Recipient",
-            f"**Name:** {recipient['name']}",
-            f"**Address:** {recipient['address1']}",
-            f"**City:** {recipient['city']}, {recipient.get('state_code', '')} {recipient['zip']}",
-            f"**Country:** {recipient['country_name']} ({recipient['country_code']})",
-            f"",
-        ])
-    
-    # Costs
-    if order.get('costs'):
-        costs = order['costs']
-        if costs['calculation_status'] == 'done':
-            lines.extend([
-                "## Costs",
-                f"**Currency:** {costs['currency']}",
-                f"**Subtotal:** {costs['subtotal']}",
-                f"**Shipping:** {costs['shipping']}",
-                f"**Tax:** {costs['tax']}",
-                f"**Total:** {costs['total']}",
-                f"",
-            ])
-        else:
-            lines.extend([
-                "## Costs",
-                f"**Status:** {costs['calculation_status']}",
-                f"",
-            ])
-    
-    # Order items
-    if order.get('order_items'):
-        lines.append(f"## Order Items ({len(order['order_items'])})")
-        for item in order['order_items']:
-            lines.extend([
-                f"- **Item {item['id']}**: {item.get('name', 'N/A')}",
-                f"  - Variant: {item.get('catalog_variant_id', 'N/A')}",
-                f"  - Quantity: {item['quantity']}",
-                f"  - Price: {item.get('price', 'N/A')} {item.get('currency', '')}",
-            ])
-        lines.append("")
-    
-    return "\n".join(lines)
-
-
-async def create_order(client: PrintfulClient, params: CreateOrderInput) -> str:
+async def create_order(transport: AsyncTransport, params: CreateOrderInput) -> str:
     """
     Create a new draft order.
-    
-    Creates an order in draft status. You'll need to add items separately using
-    add_order_item, then confirm the order to start fulfillment.
+
+    Creates an order in draft status with its items. Drafts are not charged.
+    Confirm the order with printful_confirm_order to start fulfillment.
     """
+    recipient = {
+        "name": params.recipient_name,
+        "address1": params.recipient_address1,
+        "city": params.recipient_city,
+        "country_code": params.recipient_country_code,
+        "zip": params.recipient_zip,
+    }
+    if params.recipient_state_code:
+        recipient["state_code"] = params.recipient_state_code
+    if params.recipient_email:
+        recipient["email"] = params.recipient_email
+    if params.recipient_phone:
+        recipient["phone"] = params.recipient_phone
+
     try:
-        order_data = {
-            "recipient": {
-                "name": params.recipient_name,
-                "address1": params.recipient_address1,
-                "city": params.recipient_city,
-                "country_code": params.recipient_country_code,
-                "zip": params.recipient_zip,
-            }
-        }
-        
-        if params.recipient_state_code:
-            order_data["recipient"]["state_code"] = params.recipient_state_code
-        if params.recipient_email:
-            order_data["recipient"]["email"] = params.recipient_email
-        if params.recipient_phone:
-            order_data["recipient"]["phone"] = params.recipient_phone
-        if params.external_id:
-            order_data["external_id"] = params.external_id
-        
-        data = await client.post("/orders", json_data=order_data)
-        
+        items = json.loads(params.items_json)
+    except json.JSONDecodeError as e:
+        return f"Error: items_json must be valid JSON array ({e})."
+    if not isinstance(items, list) or not items:
+        return "Error: items_json must be a non-empty JSON array of order items."
+    if not all(isinstance(item, dict) for item in items):
+        return (
+            "Error: every entry in items_json must be a JSON object, "
+            'e.g. [{"catalog_variant_id": 4012, "quantity": 1}].'
+        )
+
+    try:
+        request = orders.create_order(recipient, items, external_id=params.external_id)
+        data = await transport.send(request)
         if params.format == "json":
             return json.dumps(data, indent=2)
-        else:
-            order = data.get('data', {})
-            return format_order_markdown(order)
-            
-    except PrintfulAPIError as e:
+        return markdown.order(data.get("data", {}))
+    except ValueError as e:
+        # The core validates items and names the offending index and variant.
+        # It cannot carry this hint: the shape of a placements block is an
+        # MCP-surface concern, and the core must stay free of either caller's
+        # vocabulary (the same reason `_mockup_timeout` takes `recovery_hint`).
+        return f"Error: {e} {PLACEMENTS_HINT}"
+    except PrintfulError as e:
         return f"Error: {e.message}"
 
 
-async def get_order(client: PrintfulClient, params: GetOrderInput) -> str:
+async def get_order(transport: AsyncTransport, params: GetOrderInput) -> str:
     """
     Get details of a specific order.
-    
+
     Use order ID or external ID (prefix with @) to retrieve order information,
     including status, recipient, costs, and items.
     """
     try:
-        data = await client.get(f"/orders/{params.order_id}")
-        
+        data = await transport.send(orders.get_order(params.order_id))
         if params.format == "json":
             return json.dumps(data, indent=2)
-        else:
-            order = data.get('data', {})
-            return format_order_markdown(order)
-            
-    except PrintfulAPIError as e:
+        return markdown.order(data.get("data", {}))
+    except PrintfulError as e:
         return f"Error: {e.message}"
 
 
-async def confirm_order(client: PrintfulClient, params: ConfirmOrderInput) -> str:
+async def confirm_order(transport: AsyncTransport, params: ConfirmOrderInput) -> str:
     """
     Confirm an order to start fulfillment.
-    
-    Moves order from draft to pending status and initiates production.
-    Order must have items and costs calculated before confirmation.
+
+    Moves the order from draft to pending and begins production. This charges
+    the account. The order must have items and calculated costs first.
     """
     try:
-        data = await client.post(f"/orders/{params.order_id}/confirmation", json_data={})
-        
+        data = await transport.send(orders.confirm_order(params.order_id))
         if params.format == "json":
             return json.dumps(data, indent=2)
-        else:
-            order = data.get('data', {})
-            return f"✓ Order {order['id']} confirmed successfully!\n\n" + format_order_markdown(order)
-            
-    except PrintfulAPIError as e:
+        body = data.get("data", {})
+        return (
+            f"✓ Order {body.get('id', params.order_id)} confirmed successfully!"
+            "\n\n" + markdown.order(body)
+        )
+    except PrintfulError as e:
         return f"Error: {e.message}"
 
 
-async def list_orders(client: PrintfulClient, params: ListOrdersInput) -> str:
+async def list_orders(transport: AsyncTransport, params: ListOrdersInput) -> str:
     """
-    List all orders from the store.
-    
-    Returns a paginated list of orders with basic information.
+    List orders from the store.
+
+    Returns a paginated list of orders with basic information. Filter by status
+    to find drafts awaiting confirmation.
     """
     try:
-        query_params = {
-            "limit": params.limit,
-            "offset": params.offset,
-        }
-        
-        data = await client.get("/orders", params=query_params)
-        
+        request = orders.list_orders(limit=params.limit, offset=params.offset, status=params.status)
+        data = await transport.send(request)
         if params.format == "json":
             return json.dumps(data, indent=2)
-        else:
-            orders = data.get('data', [])
-            paging = data.get('paging', {})
-            
-            lines = [
-                f"# Orders ({paging.get('total', 0)} total)",
-                f"",
-                f"Showing {len(orders)} orders (offset: {paging.get('offset', 0)}, limit: {paging.get('limit', 20)})",
-                f"",
-            ]
-            
-            for order in orders:
-                costs = order.get('costs', {})
-                total = costs.get('total', 'Calculating...')
-                currency = costs.get('currency', '')
-                
-                lines.extend([
-                    f"## Order {order['id']}",
-                    f"- **Status:** {order['status']}",
-                    f"- **External ID:** {order.get('external_id', 'N/A')}",
-                    f"- **Total:** {total} {currency}",
-                    f"- **Items:** {len(order.get('order_items', []))}",
-                    f"- **Created:** {order['created_at']}",
-                    f"",
-                ])
-            
-            return "\n".join(lines)
-            
-    except PrintfulAPIError as e:
+        return markdown.orders(data)
+    except PrintfulError as e:
+        return f"Error: {e.message}"
+
+
+async def update_order(transport: AsyncTransport, params: UpdateOrderInput) -> str:
+    """
+    Update a draft order.
+
+    Only draft orders can be changed. Pass the fields to change as JSON.
+    """
+    try:
+        changes = json.loads(params.changes_json)
+    except json.JSONDecodeError as e:
+        return f"Error: changes_json must be valid JSON ({e})."
+    if not isinstance(changes, dict):
+        return "Error: changes_json must be a JSON object of fields to change."
+
+    try:
+        data = await transport.send(orders.update_order(params.order_id, changes))
+        if params.format == "json":
+            return json.dumps(data, indent=2)
+        return markdown.order(data.get("data", {}))
+    except ValueError as e:
+        return f"Error: {e}"
+    except PrintfulError as e:
+        return f"Error: {e.message}"
+
+
+async def cancel_order(transport: AsyncTransport, params: CancelOrderInput) -> str:
+    """
+    Cancel an order.
+
+    A draft is discarded. A confirmed order is cancelled if it has not yet
+    entered fulfillment. This cannot be undone.
+    """
+    try:
+        data = await transport.send(orders.cancel_order(params.order_id))
+        if params.format == "json":
+            return json.dumps(data, indent=2)
+        body = data.get("data", {})
+        return f"✓ Order {body.get('id', params.order_id)} cancelled."
+    except PrintfulError as e:
+        return f"Error: {e.message}"
+
+
+async def list_order_items(transport: AsyncTransport, params: ListOrderItemsInput) -> str:
+    """
+    List the items on an order.
+    """
+    try:
+        data = await transport.send(orders.list_items(params.order_id))
+        if params.format == "json":
+            return json.dumps(data, indent=2)
+        return markdown.order_items(data, params.order_id)
+    except PrintfulError as e:
+        return f"Error: {e.message}"
+
+
+async def list_order_shipments(transport: AsyncTransport, params: ListOrderShipmentsInput) -> str:
+    """
+    List the shipments for an order, with tracking numbers.
+    """
+    try:
+        data = await transport.send(orders.list_shipments(params.order_id))
+        if params.format == "json":
+            return json.dumps(data, indent=2)
+        return markdown.shipments(data, params.order_id)
+    except PrintfulError as e:
+        return f"Error: {e.message}"
+
+
+async def create_estimation_task(
+    transport: AsyncTransport, params: CreateEstimationTaskInput
+) -> str:
+    """
+    Start a cost estimate for a would-be order.
+
+    Returns a task ID immediately. Read the result with
+    printful_get_estimation_task. A catalog item must carry placements, as it
+    must for an order; items from other sources need none.
+    """
+    recipient = {"country_code": params.recipient_country_code}
+    if params.recipient_state_code:
+        recipient["state_code"] = params.recipient_state_code
+    if params.recipient_city:
+        recipient["city"] = params.recipient_city
+    if params.recipient_zip:
+        recipient["zip"] = params.recipient_zip
+
+    try:
+        items = json.loads(params.items_json)
+    except json.JSONDecodeError as e:
+        return f"Error: items_json must be valid JSON array ({e})."
+    if not isinstance(items, list) or not items:
+        return "Error: items_json must be a non-empty JSON array of order items."
+    if not all(isinstance(item, dict) for item in items):
+        return (
+            "Error: every entry in items_json must be a JSON object, "
+            'e.g. [{"catalog_variant_id": 4012, "quantity": 1}].'
+        )
+
+    try:
+        request = orders.create_estimation_task(recipient, items)
+        data = await transport.send(request)
+        if params.format == "json":
+            return json.dumps(data, indent=2)
+        body = polling.task_body(data)
+        return (
+            f"Estimation task created.\n\nTask ID: {body.get('id', 'unknown')}\n"
+            f"Status: {body.get('status', 'unknown')}\n\n"
+            "Read the result with printful_get_estimation_task."
+        )
+    except ValueError as e:
+        return f"Error: {e}"
+    except PrintfulError as e:
+        return f"Error: {e.message}"
+
+
+async def get_estimation_task(transport: AsyncTransport, params: GetEstimationTaskInput) -> str:
+    """
+    Read a cost estimate started by printful_create_estimation_task.
+
+    Returns pending, failed, or the calculated costs. Call again after a few
+    seconds while it is pending.
+
+    This is a separate tool rather than a wait inside the create call because
+    the core's polling drivers sleep against a deadline. Awaiting one here
+    would hold the tool call open for the whole timeout, and a client that
+    gave up would have created a task it could never read. The mockup tools
+    are split for the same reason.
+    """
+    try:
+        data = await transport.send(orders.get_estimation_task(params.task_id))
+        if params.format == "json":
+            return json.dumps(data, indent=2)
+        body = polling.task_body(data)
+        return markdown.estimate(body, polling.classify_task(body))
+    except PrintfulError as e:
         return f"Error: {e.message}"

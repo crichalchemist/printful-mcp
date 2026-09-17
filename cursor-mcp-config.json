@@ -1,9 +1,7 @@
 {
   "mcpServers": {
     "printful": {
-      "command": "python",
-      "args": ["-m", "printful_mcp"],
-      "cwd": "/absolute/path/to/printful-mcp",
+      "command": "/absolute/path/to/printful-mcp/.venv/bin/printful-mcp",
       "env": {
         "PRINTFUL_API_KEY": "your-api-key-here"
       }

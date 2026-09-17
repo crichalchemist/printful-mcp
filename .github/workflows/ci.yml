@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1"   # Monday 06:00 UTC, for the weekly jobs
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install -e ".[dev]"
+      # The lint scope is the test boundary: pyproject's `testpaths` runs
+      # src/ and tests/, and scripts/ holds the checker the manifests job
+      # calls. docs/ is deliberately not an argument -- ruff formats Python
+      # inside Markdown, and the historical plan documents under
+      # docs/superpowers/ are an execution record, not source to reformat.
+      - run: ruff check src/ tests/ scripts/
+      - run: ruff format --check src/ tests/ scripts/
+      # No credentials, and none needed: the offline suite must pass without
+      # them. That is also what makes this job work on a fork's pull request.
+      - run: pytest -q
+
+  server-boots:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -e ".[dev]"
+      # The parity suite, not a hardcoded count: it asserts every core builder
+      # is reachable through exactly one tool, and names the offending symbol
+      # when it is not. A legitimate new tool must not fail CI for being new.
+      - run: pytest -q src/printful_mcp/tests/test_server.py
+
+  manifests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Every manifest parses, versions agree, referenced paths exist
+        run: python scripts/check_manifests.py
+
+  upstream-drift:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    # Deliberately NOT continue-on-error. It carried that flag while the repo
+    # was pinned to mcp<2, which made the job unable to do its only job: the
+    # upgrade always failed the import, so it failed every week forever, and
+    # continue-on-error made the RUN conclude success, so nobody was notified.
+    # A weekly red run is the announcement. If it goes red, read the import
+    # error before changing the pin.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      # Install the newest mcp WITHOUT the pin and check the server still works.
+      - run: pip install -e . && pip install --upgrade "mcp"
+      # Import is necessary but NOT sufficient, and that gap is not theoretical:
+      # the 1.x->2.x move broke `mcp.settings.host` in __main__.py, which import
+      # cannot reach. Build the HTTP app too, so a transport break fails here
+      # rather than for a user running --transport http.
+      - run: |
+          python -c "import printful_mcp.server; print('imports clean')"
+          python -c "
+          from printful_mcp.server import mcp
+          mcp.streamable_http_app()
+          print('streamable-http app builds')
+          "
+
+  live:
+    # The repository guard is load-bearing. Without it a fork's scheduled run
+    # finds no secret, Credentials.resolve() fails loudly by design, and every
+    # fork gets a red badge for a job that was never theirs to run.
+    # PRINTFUL_E2E_MOCKUPS is deliberately absent, so mockup creation stays
+    # skipped and the 60-second Printful lockout is never provoked.
+    # This selects the whole live suite, so TestLiveDraftOrder creates and
+    # cancels a real draft order every week. Nothing is charged -- a draft is
+    # not a confirmed order, and no live test reaches confirm_order.
+    if: github.event_name == 'schedule' && github.repository == 'crichalchemist/printful-mcp'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -e ".[dev]"
+      - run: pytest -m live -q
+        env:
+          PRINTFUL_API_KEY: ${{ secrets.PRINTFUL_API_KEY }}
+          PRINTFUL_STORE_ID: ${{ secrets.PRINTFUL_STORE_ID }}

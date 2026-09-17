@@ -1,0 +1,27 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    # Pinned to the ruff in this repository's .venv, which is what
+    # `pip install -e ".[dev]"` produced here. Note that a bare `ruff` on PATH
+    # may be a different build entirely -- resolve the version from the
+    # environment you installed into, not from whatever PATH finds first.
+    rev: v0.16.7
+    hooks:
+      # `ruff-check`, not `ruff`: at this rev the bare `ruff` id still works but
+      # announces itself as a legacy alias on every commit.
+      - id: ruff-check
+        args: [--fix]
+        # The same scope the CI lint gate uses, and the reason is the same:
+        # ruff formats Python inside Markdown, and the plan documents under
+        # docs/superpowers/ are an execution record that no gate may rewrite.
+        # Spelling the scope here means that holds whatever file types the
+        # upstream hook declares.
+        files: ^(src|tests|scripts)/
+      - id: ruff-format
+        files: ^(src|tests|scripts)/
+  - repo: local
+    hooks:
+      - id: manifests
+        name: manifests parse and versions agree
+        entry: python scripts/check_manifests.py
+        language: system
+        pass_filenames: false

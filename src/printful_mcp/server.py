@@ -1,64 +1,55 @@
 """Printful MCP Server - Main server implementation."""
 
-import asyncio
-import atexit
 import os
 import sys
-from mcp.server.fastmcp import FastMCP
-from dotenv import load_dotenv
 
-from .client import PrintfulClient
+from dotenv import load_dotenv
+from mcp.server.mcpserver import MCPServer
+
 from .models.inputs import (
-    ListCatalogProductsInput,
+    AddFileInput,
+    CalculateShippingInput,
+    CalculateTaxInput,
+    CancelOrderInput,
+    ConfirmOrderInput,
+    CreateEstimationTaskInput,
+    CreateMockupTaskInput,
+    CreateOrderInput,
+    GetCategoryInput,
+    GetEstimationTaskInput,
+    GetFileInput,
+    GetMockupTaskInput,
+    GetOrderInput,
+    GetProductAvailabilityInput,
     GetProductInput,
     GetProductVariantsInput,
-    GetVariantPricesInput,
-    GetProductAvailabilityInput,
-    CreateOrderInput,
-    GetOrderInput,
-    ConfirmOrderInput,
-    ListOrdersInput,
-    CalculateShippingInput,
-    CreateMockupTaskInput,
-    GetMockupTaskInput,
-    AddFileInput,
-    GetFileInput,
-    ListStoresInput,
+    GetSizeGuideInput,
     GetStoreStatsInput,
+    GetVariantPricesInput,
+    ListCatalogProductsInput,
+    ListCategoriesInput,
+    ListMockupStylesInput,
+    ListMockupTemplatesInput,
+    ListOrderItemsInput,
+    ListOrderShipmentsInput,
+    ListOrdersInput,
+    ListStoresInput,
+    ListStoreTemplatesInput,
+    UpdateOrderInput,
 )
-from .tools import catalog, orders, shipping, mockups, files, stores, sync
-from .tools.sync import ListSyncProductsInput, GetSyncProductInput
+from .tools import catalog, files, mockups, orders, shipping, stores, sync
+from .tools.sync import GetSyncProductInput, ListSyncProductsInput
+from .transport import get_transport
 
 # Load environment variables
 load_dotenv()
 
 # Initialize MCP server
-mcp = FastMCP("printful_mcp")
-
-# Global client instance (lazily initialized)
-_client: PrintfulClient = None
-
-
-def _cleanup_client():
-    """Close the client on exit."""
-    global _client
-    if _client is not None:
-        try:
-            asyncio.get_event_loop().run_until_complete(_client.close())
-        except Exception:
-            pass  # Best effort cleanup
-
-
-def get_client() -> PrintfulClient:
-    """Get or create the PrintfulClient instance."""
-    global _client
-    if _client is None:
-        _client = PrintfulClient()
-        atexit.register(_cleanup_client)
-    return _client
+mcp = MCPServer("printful_mcp")
 
 
 # ========== CATALOG TOOLS ==========
+
 
 @mcp.tool(
     name="printful_list_catalog_products",
@@ -68,16 +59,16 @@ def get_client() -> PrintfulClient:
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_list_catalog_products(params: ListCatalogProductsInput) -> str:
     """
     Browse Printful's product catalog with optional filters.
-    
+
     Returns a list of available products including t-shirts, mugs, posters, etc.
     Use filters to narrow down by category, color, technique, or product type.
     """
-    return await catalog.list_catalog_products(get_client(), params)
+    return await catalog.list_catalog_products(get_transport(), params)
 
 
 @mcp.tool(
@@ -88,16 +79,17 @@ async def printful_list_catalog_products(params: ListCatalogProductsInput) -> st
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_get_product(params: GetProductInput) -> str:
     """
     Get detailed information about a specific catalog product.
-    
-    Returns placements (where designs can be printed), techniques (DTG, embroidery, etc.),
-    available sizes/colors, and design requirements.
+
+    Returns the name, ID, type, brand, variant count, status, description, available
+    techniques (DTG, embroidery, etc.), and the first five placements. For sizes and
+    colors use printful_get_product_variants; for measurements use printful_get_size_guide.
     """
-    return await catalog.get_product(get_client(), params)
+    return await catalog.get_product(get_transport(), params)
 
 
 @mcp.tool(
@@ -108,16 +100,16 @@ async def printful_get_product(params: GetProductInput) -> str:
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_get_product_variants(params: GetProductVariantsInput) -> str:
     """
     Get all variants (size/color combinations) for a product.
-    
+
     Each variant has a unique ID needed for ordering. Returns variant IDs,
-    names, sizes, colors, and preview images.
+    names, sizes, and colors with their color codes.
     """
-    return await catalog.get_product_variants(get_client(), params)
+    return await catalog.get_product_variants(get_transport(), params)
 
 
 @mcp.tool(
@@ -128,16 +120,16 @@ async def printful_get_product_variants(params: GetProductVariantsInput) -> str:
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_get_variant_prices(params: GetVariantPricesInput) -> str:
     """
     Get pricing information for a specific variant.
-    
-    Returns base prices by technique, placement costs, and quantity discounts.
+
+    Returns the currency, base prices by technique, and additional placement prices.
     Helps calculate total order costs before ordering.
     """
-    return await catalog.get_variant_prices(get_client(), params)
+    return await catalog.get_variant_prices(get_transport(), params)
 
 
 @mcp.tool(
@@ -148,19 +140,73 @@ async def printful_get_variant_prices(params: GetVariantPricesInput) -> str:
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_get_product_availability(params: GetProductAvailabilityInput) -> str:
     """
     Check stock availability for a product's variants.
-    
+
     Returns in-stock/out-of-stock status for each variant and technique
     by selling region. Critical for displaying product availability.
     """
-    return await catalog.get_product_availability(get_client(), params)
+    return await catalog.get_product_availability(get_transport(), params)
+
+
+@mcp.tool(
+    name="printful_list_categories",
+    annotations={
+        "title": "List Catalog Categories",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def printful_list_categories(params: ListCategoriesInput) -> str:
+    """
+    List the catalog's product categories.
+
+    Category IDs are what printful_list_catalog_products filters on.
+    """
+    return await catalog.list_categories(get_transport(), params)
+
+
+@mcp.tool(
+    name="printful_get_category",
+    annotations={
+        "title": "Get Catalog Category",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def printful_get_category(params: GetCategoryInput) -> str:
+    """
+    Get one catalog category by ID.
+    """
+    return await catalog.get_category(get_transport(), params)
+
+
+@mcp.tool(
+    name="printful_get_size_guide",
+    annotations={
+        "title": "Get Product Size Guide",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def printful_get_size_guide(params: GetSizeGuideInput) -> str:
+    """
+    Get the size tables for a catalog product, in inches or centimetres.
+    """
+    return await catalog.get_size_guide(get_transport(), params)
 
 
 # ========== ORDER TOOLS ==========
+
 
 @mcp.tool(
     name="printful_create_order",
@@ -170,16 +216,16 @@ async def printful_get_product_availability(params: GetProductAvailabilityInput)
         "destructiveHint": False,
         "idempotentHint": False,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_create_order(params: CreateOrderInput) -> str:
     """
     Create a new order in draft status.
-    
-    Creates an empty order with recipient info. Add items separately, then
-    confirm to start fulfillment. Draft orders are not charged.
+
+    Creates an order in draft status with its items. Drafts are not charged
+    until confirmed. Each catalog item requires placements (artwork).
     """
-    return await orders.create_order(get_client(), params)
+    return await orders.create_order(get_transport(), params)
 
 
 @mcp.tool(
@@ -190,16 +236,17 @@ async def printful_create_order(params: CreateOrderInput) -> str:
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_get_order(params: GetOrderInput) -> str:
     """
     Get details of a specific order.
-    
-    Returns order status, recipient, costs, items, and shipment info.
+
+    Returns order status, recipient, costs, and items.
     Use order ID or external ID (prefix with @).
+    For shipments and tracking, use printful_list_order_shipments.
     """
-    return await orders.get_order(get_client(), params)
+    return await orders.get_order(get_transport(), params)
 
 
 @mcp.tool(
@@ -207,19 +254,19 @@ async def printful_get_order(params: GetOrderInput) -> str:
     annotations={
         "title": "Confirm Order for Fulfillment",
         "readOnlyHint": False,
-        "destructiveHint": False,
+        "destructiveHint": True,
         "idempotentHint": False,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_confirm_order(params: ConfirmOrderInput) -> str:
     """
     Confirm an order to start production and fulfillment.
-    
+
     Moves order from draft to pending status. Order will be charged and
     sent to production. Cannot be undone easily.
     """
-    return await orders.confirm_order(get_client(), params)
+    return await orders.confirm_order(get_transport(), params)
 
 
 @mcp.tool(
@@ -230,18 +277,123 @@ async def printful_confirm_order(params: ConfirmOrderInput) -> str:
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_list_orders(params: ListOrdersInput) -> str:
     """
     List all orders from the store.
-    
+
     Returns paginated list of orders with status, costs, and item counts.
     """
-    return await orders.list_orders(get_client(), params)
+    return await orders.list_orders(get_transport(), params)
+
+
+@mcp.tool(
+    name="printful_update_order",
+    annotations={
+        "title": "Update Draft Order",
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": False,
+        "openWorldHint": True,
+    },
+)
+async def printful_update_order(params: UpdateOrderInput) -> str:
+    """
+    Update a draft order. Only drafts can be changed.
+    """
+    return await orders.update_order(get_transport(), params)
+
+
+@mcp.tool(
+    name="printful_cancel_order",
+    annotations={
+        "title": "Cancel Order",
+        "readOnlyHint": False,
+        "destructiveHint": True,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def printful_cancel_order(params: CancelOrderInput) -> str:
+    """
+    Cancel an order. A draft is discarded; a confirmed order is cancelled if it
+    has not entered fulfillment. This cannot be undone.
+    """
+    return await orders.cancel_order(get_transport(), params)
+
+
+@mcp.tool(
+    name="printful_list_order_items",
+    annotations={
+        "title": "List Order Items",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def printful_list_order_items(params: ListOrderItemsInput) -> str:
+    """
+    List the items on an order.
+    """
+    return await orders.list_order_items(get_transport(), params)
+
+
+@mcp.tool(
+    name="printful_list_order_shipments",
+    annotations={
+        "title": "List Order Shipments",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def printful_list_order_shipments(params: ListOrderShipmentsInput) -> str:
+    """
+    List the shipments for an order, with tracking numbers.
+    """
+    return await orders.list_order_shipments(get_transport(), params)
+
+
+@mcp.tool(
+    name="printful_create_estimation_task",
+    annotations={
+        "title": "Start Cost Estimate",
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": False,
+        "openWorldHint": True,
+    },
+)
+async def printful_create_estimation_task(params: CreateEstimationTaskInput) -> str:
+    """
+    Start a cost estimate for a would-be order. Returns a task ID immediately;
+    read the result with printful_get_estimation_task.
+    """
+    return await orders.create_estimation_task(get_transport(), params)
+
+
+@mcp.tool(
+    name="printful_get_estimation_task",
+    annotations={
+        "title": "Get Cost Estimate",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def printful_get_estimation_task(params: GetEstimationTaskInput) -> str:
+    """
+    Read a cost estimate. Returns pending, failed, or the calculated costs.
+    """
+    return await orders.get_estimation_task(get_transport(), params)
 
 
 # ========== SHIPPING TOOLS ==========
+
 
 @mcp.tool(
     name="printful_calculate_shipping",
@@ -251,16 +403,16 @@ async def printful_list_orders(params: ListOrdersInput) -> str:
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_calculate_shipping(params: CalculateShippingInput) -> str:
     """
     Calculate shipping rates for an order.
-    
+
     Returns available shipping methods, costs, and estimated delivery times
     based on recipient location and order items.
     """
-    return await shipping.calculate_shipping_rates(get_client(), params)
+    return await shipping.calculate_shipping_rates(get_transport(), params)
 
 
 @mcp.tool(
@@ -271,19 +423,37 @@ async def printful_calculate_shipping(params: CalculateShippingInput) -> str:
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": False,
-    }
+    },
 )
 async def printful_list_countries() -> str:
     """
     List all countries where Printful ships.
-    
+
     Returns country codes and state codes needed for creating orders.
     Essential for address validation.
     """
-    return await shipping.list_countries(get_client())
+    return await shipping.list_countries(get_transport())
+
+
+@mcp.tool(
+    name="printful_calculate_tax",
+    annotations={
+        "title": "Calculate Tax Rate",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def printful_calculate_tax(params: CalculateTaxInput) -> str:
+    """
+    Get the tax rate for a destination. Uses API v1; v2 has no tax endpoint.
+    """
+    return await shipping.calculate_tax(get_transport(), params)
 
 
 # ========== MOCKUP TOOLS ==========
+
 
 @mcp.tool(
     name="printful_create_mockup_task",
@@ -293,16 +463,16 @@ async def printful_list_countries() -> str:
         "destructiveHint": False,
         "idempotentHint": False,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_create_mockup_task(params: CreateMockupTaskInput) -> str:
     """
     Generate product mockup images.
-    
+
     Creates an async task to generate mockup images showing your design
     on the product. Returns task ID to check status and get URLs.
     """
-    return await mockups.create_mockup_task(get_client(), params)
+    return await mockups.create_mockup_task(get_transport(), params)
 
 
 @mcp.tool(
@@ -313,19 +483,55 @@ async def printful_create_mockup_task(params: CreateMockupTaskInput) -> str:
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_get_mockup_task(params: GetMockupTaskInput) -> str:
     """
     Check mockup generation status and get results.
-    
+
     Returns task status (pending/completed/failed) and mockup image URLs
     if completed. Typically takes 10-30 seconds to generate.
     """
-    return await mockups.get_mockup_task(get_client(), params)
+    return await mockups.get_mockup_task(get_transport(), params)
+
+
+@mcp.tool(
+    name="printful_list_mockup_styles",
+    annotations={
+        "title": "List Mockup Styles",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def printful_list_mockup_styles(params: ListMockupStylesInput) -> str:
+    """
+    List the mockup styles available for a catalog product. Style IDs feed
+    printful_create_mockup_task.
+    """
+    return await mockups.list_mockup_styles(get_transport(), params)
+
+
+@mcp.tool(
+    name="printful_list_mockup_templates",
+    annotations={
+        "title": "List Mockup Templates",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def printful_list_mockup_templates(params: ListMockupTemplatesInput) -> str:
+    """
+    List the print-area templates for a catalog product.
+    """
+    return await mockups.list_mockup_templates(get_transport(), params)
 
 
 # ========== FILE TOOLS ==========
+
 
 @mcp.tool(
     name="printful_add_file",
@@ -335,16 +541,16 @@ async def printful_get_mockup_task(params: GetMockupTaskInput) -> str:
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_add_file(params: AddFileInput) -> str:
     """
     Add a design file to the Printful file library.
-    
+
     Uploads file from URL for reuse across orders. Files are processed
     asynchronously. Returns file ID for use in orders.
     """
-    return await files.add_file(get_client(), params)
+    return await files.add_file(get_transport(), params)
 
 
 @mcp.tool(
@@ -355,19 +561,20 @@ async def printful_add_file(params: AddFileInput) -> str:
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_get_file(params: GetFileInput) -> str:
     """
     Get information about a file in the library.
-    
+
     Returns file status, dimensions, DPI, and URLs. Check processing
     status before using in orders.
     """
-    return await files.get_file(get_client(), params)
+    return await files.get_file(get_transport(), params)
 
 
 # ========== STORE TOOLS ==========
+
 
 @mcp.tool(
     name="printful_list_stores",
@@ -377,15 +584,15 @@ async def printful_get_file(params: GetFileInput) -> str:
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": False,
-    }
+    },
 )
 async def printful_list_stores(params: ListStoresInput) -> str:
     """
     List all stores available to your API token.
-    
+
     Returns store IDs and names. Needed for multi-store accounts.
     """
-    return await stores.list_stores(get_client(), params)
+    return await stores.list_stores(get_transport(), params)
 
 
 @mcp.tool(
@@ -396,19 +603,37 @@ async def printful_list_stores(params: ListStoresInput) -> str:
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_get_store_stats(params: GetStoreStatsInput) -> str:
     """
     Get store statistics for a date range.
-    
+
     Returns sales, costs, profit, order counts, and fulfillment metrics.
     Date range cannot exceed 6 months.
     """
-    return await stores.get_store_statistics(get_client(), params)
+    return await stores.get_store_statistics(get_transport(), params)
+
+
+@mcp.tool(
+    name="printful_list_store_templates",
+    annotations={
+        "title": "List Product Templates",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def printful_list_store_templates(params: ListStoreTemplatesInput) -> str:
+    """
+    List the store's saved product templates.
+    """
+    return await stores.list_store_templates(get_transport(), params)
 
 
 # ========== V1 FALLBACK TOOLS ==========
+
 
 @mcp.tool(
     name="printful_list_sync_products",
@@ -418,16 +643,16 @@ async def printful_get_store_stats(params: GetStoreStatsInput) -> str:
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_list_sync_products(params: ListSyncProductsInput) -> str:
     """
     List sync products using v1 API (not available in v2 yet).
-    
+
     Sync products are pre-configured templates with saved designs.
     Currently only available via v1 API.
     """
-    return await sync.list_sync_products(get_client(), params)
+    return await sync.list_sync_products(get_transport(), params)
 
 
 @mcp.tool(
@@ -438,21 +663,21 @@ async def printful_list_sync_products(params: ListSyncProductsInput) -> str:
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True,
-    }
+    },
 )
 async def printful_get_sync_product(params: GetSyncProductInput) -> str:
     """
     Get sync product details using v1 API (not available in v2 yet).
-    
+
     Returns full sync product info including variants and designs.
     Currently only available via v1 API.
     """
-    return await sync.get_sync_product(get_client(), params)
+    return await sync.get_sync_product(get_transport(), params)
 
 
 def main():
     """Entry point for the MCP server (stdio only, for backwards compatibility).
-    
+
     For full CLI with transport options, use: python -m printful_mcp --help
     """
     # Check for API key
@@ -460,7 +685,7 @@ def main():
         print("Error: PRINTFUL_API_KEY environment variable is required", file=sys.stderr)
         print("Get your API key from: https://www.printful.com/dashboard/api", file=sys.stderr)
         sys.exit(1)
-    
+
     # Run the server with stdio transport (default for Cursor/Claude Desktop)
     mcp.run(transport="stdio")
 

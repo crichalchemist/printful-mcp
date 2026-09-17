@@ -1,107 +1,112 @@
-"""Mockup generator tools for Printful MCP server."""
+"""Mockup generator tools for the Printful MCP server."""
 
 import json
-from typing import Dict, Any
-from ..client import PrintfulClient, PrintfulAPIError
-from ..models.inputs import CreateMockupTaskInput, GetMockupTaskInput
+
+from printful_core import polling
+from printful_core.endpoints import mockups
+from printful_core.errors import PrintfulError
+from printful_core.format import markdown
+from printful_core.transport import AsyncTransport
+
+from ..models.inputs import (
+    CreateMockupTaskInput,
+    GetMockupTaskInput,
+    ListMockupStylesInput,
+    ListMockupTemplatesInput,
+)
 
 
-async def create_mockup_task(client: PrintfulClient, params: CreateMockupTaskInput) -> str:
+def _ids(raw: str) -> list:
+    return [int(v.strip()) for v in raw.split(",") if v.strip()]
+
+
+async def create_mockup_task(transport: AsyncTransport, params: CreateMockupTaskInput) -> str:
     """
     Create a mockup generation task.
-    
-    Generates product mockups asynchronously. Returns a task ID that can be used
-    to check status and retrieve mockup URLs. Process typically takes 10-30 seconds.
+
+    Generates product mockups asynchronously. Returns a task ID; read the result
+    with printful_get_mockup_task. Generation usually takes 10-30 seconds.
+
+    Mockup creation is limited to 10 requests/60s (established stores) or
+    2 requests/60s (new stores), with a 60s lockout when exceeded. Do not retry
+    in a loop.
     """
     try:
-        # Parse comma-separated IDs
-        variant_ids = [int(v.strip()) for v in params.variant_ids.split(",")]
-        style_ids = [int(s.strip()) for s in params.mockup_style_ids.split(",")]
-        
-        request_data = {
-            "format": params.format,
-            "products": [{
-                "source": "catalog",
-                "catalog_product_id": params.product_id,
-                "catalog_variant_ids": variant_ids,
-                "mockup_style_ids": style_ids,
-                "placements": [{
-                    "placement": params.placement,
-                    "technique": params.technique,
-                    "layers": [{
-                        "type": "file",
-                        "url": params.design_url,
-                    }]
-                }]
-            }]
-        }
-        
-        data = await client.post("/mockup-tasks", json_data=request_data)
-        
-        # Return the task info
-        tasks = data.get('data', [])
-        if tasks:
-            task = tasks[0]
-            return f"Mockup task created!\n\nTask ID: {task['id']}\nStatus: {task['status']}\n\nUse printful_get_mockup_task with this ID to check status and get mockup URLs."
-        else:
+        variant_ids = _ids(params.variant_ids)
+        style_ids = _ids(params.mockup_style_ids) if params.mockup_style_ids else None
+    except ValueError as e:
+        return f"Error: {e}"
+
+    try:
+        request = mockups.create_task(
+            params.product_id,
+            variant_ids,
+            params.design_url,
+            placement=params.placement,
+            technique=params.technique,
+            style_ids=style_ids,
+            image_format=params.format,
+        )
+        data = await transport.send(request)
+        body = polling.task_body(data)
+        if not body:
             return json.dumps(data, indent=2)
-            
-    except PrintfulAPIError as e:
+        return (
+            f"Mockup task created!\n\nTask ID: {body.get('id', 'unknown')}\n"
+            f"Status: {body.get('status', 'unknown')}\n\n"
+            "Use printful_get_mockup_task with this ID to check status and "
+            "get mockup URLs."
+        )
+    except ValueError as e:
+        return f"Error: {e}"
+    except PrintfulError as e:
         return f"Error: {e.message}"
-    except (ValueError, KeyError) as e:
-        return f"Error parsing input: {str(e)}"
 
 
-async def get_mockup_task(client: PrintfulClient, params: GetMockupTaskInput) -> str:
+async def get_mockup_task(transport: AsyncTransport, params: GetMockupTaskInput) -> str:
     """
     Get mockup task status and results.
-    
-    Check if mockup generation is complete and retrieve mockup image URLs.
-    Task status can be: pending, completed, or failed.
+
+    Check whether mockup generation is complete and retrieve image URLs. Status
+    is pending, completed, or failed.
     """
     try:
-        data = await client.get("/mockup-tasks", params={"id": params.task_id})
-        
+        data = await transport.send(mockups.get_task(params.task_id))
         if params.format == "json":
             return json.dumps(data, indent=2)
-        else:
-            tasks = data.get('data', [])
-            if not tasks:
-                return f"No task found with ID {params.task_id}"
-            
-            task = tasks[0]
-            lines = [
-                f"# Mockup Task {task['id']}",
-                f"",
-                f"**Status:** {task['status']}",
-                f"",
-            ]
-            
-            if task['status'] == 'completed':
-                variant_mockups = task.get('catalog_variant_mockups', [])
-                lines.append(f"## Generated Mockups ({len(variant_mockups)} variants)")
-                
-                for vm in variant_mockups:
-                    lines.append(f"### Variant {vm['catalog_variant_id']}")
-                    for mockup in vm.get('mockups', []):
-                        lines.extend([
-                            f"- **{mockup['display_name']}** ({mockup['placement']})",
-                            f"  - Style ID: {mockup['style_id']}",
-                            f"  - URL: {mockup['mockup_url']}",
-                        ])
-                    lines.append("")
-            
-            elif task['status'] == 'pending':
-                lines.append("⏳ Mockup generation in progress. Check again in a few seconds.")
-            
-            elif task['status'] == 'failed':
-                lines.append("❌ Mockup generation failed.")
-                if task.get('failure_reasons'):
-                    lines.append("\n**Reasons:**")
-                    for reason in task['failure_reasons']:
-                        lines.append(f"- {reason.get('detail', 'Unknown error')}")
-            
-            return "\n".join(lines)
-            
-    except PrintfulAPIError as e:
+        body = polling.task_body(data)
+        if not body:
+            return f"No task found with ID {params.task_id}"
+        return markdown.mockup_task(body)
+    except PrintfulError as e:
+        return f"Error: {e.message}"
+
+
+async def list_mockup_styles(transport: AsyncTransport, params: ListMockupStylesInput) -> str:
+    """
+    List the mockup styles available for a catalog product.
+
+    Style IDs are what printful_create_mockup_task takes in mockup_style_ids.
+    """
+    try:
+        data = await transport.send(mockups.list_styles(params.product_id))
+        if params.format == "json":
+            return json.dumps(data, indent=2)
+        return markdown.mockup_styles(data, params.product_id)
+    except PrintfulError as e:
+        return f"Error: {e.message}"
+
+
+async def list_mockup_templates(transport: AsyncTransport, params: ListMockupTemplatesInput) -> str:
+    """
+    List the print-area templates for a catalog product.
+
+    Templates give the printable dimensions a design must fit.
+    """
+    try:
+        data = await transport.send(mockups.list_templates(params.product_id))
+        if params.format == "json":
+            return json.dumps(data, indent=2)
+        return markdown.mockup_templates(data, params.product_id)
+    except PrintfulError as e:
         return f"Error: {e.message}"

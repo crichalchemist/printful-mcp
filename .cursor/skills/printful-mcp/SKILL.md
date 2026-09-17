@@ -5,7 +5,11 @@ description: Automate Printful print-on-demand operations through AI. Use when t
 
 # Printful MCP Automation
 
-Expert guidance for automating Printful print-on-demand workflows using the Printful MCP server's 17 tools.
+Expert guidance for automating Printful print-on-demand workflows using the Printful MCP server's 32 tools.
+
+The tool reference below is kept one-to-one with what the server registers. If you ever doubt
+it, your own client's tool list is the authority — ask it what the server advertises rather than
+trusting this file's count.
 
 ## Quick Reference
 
@@ -35,13 +39,13 @@ Once you have an account:
 
 | Category | Tools | Common Use Cases |
 |----------|-------|------------------|
-| 🛍️ **Catalog** (5) | Browse, search, pricing | "Show me all t-shirts under $15" |
-| 📦 **Orders** (4) | Create, manage, fulfill | "Create order for John in LA" |
-| 🚚 **Shipping** (2) | Rates, countries | "How much to ship to UK?" |
-| 🖼️ **Mockups** (2) | Generate, check status | "Create mockup with my design" |
-| 📁 **Files** (2) | Upload, retrieve | "Upload my logo file" |
-| 🏪 **Stores** (2) | List, statistics | "Show my store sales" |
-| 🔄 **Sync** (2) | Legacy products | "List my synced products" |
+| 🛍️ **Catalog** | Browse, search, pricing, categories, size guides | "Show me all t-shirts under $15" |
+| 📦 **Orders** | Create, update, manage, fulfill, cancel, estimate | "Create order for John in LA" |
+| 🚚 **Shipping** | Rates, countries, tax | "How much to ship to UK?" |
+| 🖼️ **Mockups** | Generate, check status, styles, templates | "Create mockup with my design" |
+| 📁 **Files** | Upload, retrieve | "Upload my logo file" |
+| 🏪 **Stores** | List, statistics, product templates | "Show my store sales" |
+| 🔄 **Sync** | Legacy products | "List my synced products" |
 
 ## Common Workflows
 
@@ -146,8 +150,10 @@ Once you have an account:
 
 **5. Request markdown format for readability**
 ```
-✅ Most tools support format="markdown" (default)
+✅ Every tool takes format="markdown" (default) or format="json"
 ✅ Use format="json" only for programmatic processing
+⚠️ Two exceptions: printful_list_countries takes no arguments at all, and on
+   printful_create_mockup_task `format` is the IMAGE format ("jpg" / "png")
 ```
 
 ### ❌ Avoid This
@@ -168,10 +174,22 @@ Once you have an account:
 ```
 ❌ Making 100+ requests in quick succession
 ✅ Batch operations, space out requests
-Rate limit: 120 requests per 60 seconds
+General limit: 120 requests per 60 seconds
+Mockup creation: 10 per 60s for established stores, 2 per 60s for NEW stores,
+  with a 60-second lockout once exceeded, plus 20,000 generated files per
+  account per 24 hours
 ```
 
-**4. Store ID is NOT required for most operations**
+**4. Treat a rate-limit error as final, not as a prompt to retry**
+```
+❌ Catching the error and calling again
+✅ Reporting it to the user with the wait time from the message
+The server does not retry. A 429 is raised immediately, carrying Printful's
+Retry-After value, because a silent retry is what walks a new store into the
+60-second mockup lockout.
+```
+
+**5. Store ID is NOT required for most operations**
 ```
 ✅ Catalog, orders, mockups, shipping, files → No store_id needed
 ✅ Only printful_get_store_stats requires store_id as a parameter
@@ -184,42 +202,67 @@ Rate limit: 120 requests per 60 seconds
 ### 🛍️ Catalog Tools
 
 **printful_list_catalog_products**
-- Browse 300+ products with filters
-- Filter by: type, category, technique, brand
-- Returns: Product list with IDs, names, images, prices
+- Browse the catalog with filters
+- Optional: `limit` (default 20, max 100), `offset`, and the comma-separated filters `category_ids`, `colors`, `techniques`, `types`
+- ⚠️ **There is no brand filter.** Those four are the only filters that exist, and an unrecognized one is *silently ignored* rather than rejected — so a misspelled or invented filter returns a full, unfiltered list that looks exactly like a filtered one
+- Returns: Product list with IDs, names, types, variant counts and techniques — no images and no prices (use `printful_get_variant_prices` for pricing)
 
 **printful_get_product**
 - Detailed product information
-- Includes: Placements, techniques, available files
+- Required: `product_id`
+- Returns: Name, ID, type, brand, variant count, status, description, available techniques, and placements
 - Use: When user wants deep product details
 
 **printful_get_product_variants**
 - All size/color combinations
-- Returns: Variant IDs, names, dimensions
+- Required: `product_id`
+- Optional: `limit`, `offset`
+- Returns: Variant IDs, names, sizes and colors
 - Use: "What sizes are available?"
 
 **printful_get_variant_prices**
 - Pricing by currency
-- Supports: USD, EUR, GBP, CAD, etc.
+- Required: `variant_id`
+- Optional: `currency` (e.g. USD, EUR, GBP, CAD)
 - Use: "How much in euros?"
 
 **printful_get_product_availability**
 - Real-time stock status
+- Required: `product_id`
+- Optional: `techniques` (comma-separated)
 - Returns: Available regions, stock levels
 - Use: Before creating orders
+
+**printful_list_categories**
+- List the catalog's product categories
+- Optional: `limit` (default 20), `offset`
+- Use: The category IDs it returns are what `printful_list_catalog_products` filters on
+
+**printful_get_category**
+- Get one catalog category
+- Required: `category_id`
+- Use: "What is category 24?"
+
+**printful_get_size_guide**
+- Size tables for a catalog product, in inches or centimetres
+- Required: `product_id`
+- Optional: `unit` (`"inches"` or `"cm"`; omit for the API default)
+- Use: "What are the measurements for a size L?"
 
 ### 📦 Order Tools
 
 **printful_create_order**
-- Create draft order with recipient
-- Required: Name, address, city, state, country, zip
-- Optional: Phone, email, external_id
+- Create draft order with recipient and items
+- Required: `recipient_name`, `recipient_address1`, `recipient_city`, `recipient_country_code`, `recipient_zip`, and `items_json`
+- `items_json`: JSON array of items, each with `source`, `catalog_variant_id`, `quantity`, and `placements` carrying the artwork — an item with no design is rejected
+- Optional: `recipient_state_code`, `recipient_email`, `recipient_phone`, `external_id`
+- ⚠️ `recipient_state_code` is optional *to the tool* but **Printful requires it for US, CA and AU addresses** — omit it there and the API rejects the order
 - Returns: Order ID (save this!)
 
 **printful_get_order**
 - View order details and status
 - Use order ID or @external_id
-- Returns: Full order with items, status, tracking
+- Returns: Order status, recipient, costs and items — no tracking; use `printful_list_order_shipments` for that
 
 **printful_confirm_order**
 - Start production/fulfillment
@@ -229,45 +272,107 @@ Rate limit: 120 requests per 60 seconds
 
 **printful_list_orders**
 - List all orders with filters
-- Filter by: Status, external_id
+- Optional: `limit`, `offset`, `status`
 - Use: "Show my recent orders"
+
+**printful_update_order**
+- Change a draft order
+- Required: `order_id`, `changes_json` (a JSON object of fields to change, e.g. `{"recipient":{"address1":"2 New Street"}}`)
+- ⚠️ **Only drafts can be updated.** A confirmed order cannot be edited
+- Use: Fixing an address before confirming
+
+**printful_cancel_order**
+- Cancel an order
+- Required: `order_id` (or `@external_id`)
+- ⚠️ **Destructive and cannot be undone.** A draft is discarded; a confirmed order is cancelled only if it has not entered fulfillment
+- Use: Only on the user's explicit instruction
+
+**printful_list_order_items**
+- List the items on an order
+- Required: `order_id` (or `@external_id`)
+- Use: "What's in order 12345?"
+
+**printful_list_order_shipments**
+- List the shipments for an order, with tracking numbers
+- Required: `order_id` (or `@external_id`)
+- Use: "Where is my order?"
+
+**printful_create_estimation_task**
+- Start a cost estimate for a would-be order — no order is created and nothing is charged
+- Required: `recipient_country_code`, `items_json`
+- Optional: `recipient_state_code` (Printful requires it for US, CA, AU), `recipient_city`, `recipient_zip`
+- Returns: A task ID, immediately — not the costs
+- Use: Quoting a total before committing
+
+**printful_get_estimation_task**
+- Read the result of a cost estimate
+- Required: `task_id` (from `printful_create_estimation_task`)
+- Returns: `pending`, `failed`, or the calculated costs
+- Use: A few seconds after starting the estimate
 
 ### 🚚 Shipping Tools
 
 **printful_calculate_shipping**
 - Get shipping rates and delivery times
-- Required: Recipient address, items
+- Required: `recipient_country_code` **and `items_json`** — a rate cannot be quoted without knowing what is being shipped
+- `items_json`: JSON array of items, each with `source`, `catalog_variant_id` and `quantity`. Artwork is not needed to quote a rate, only to place the order
+- Optional: `recipient_state_code`, `recipient_city`, `recipient_zip`, `currency`
 - Returns: Available carriers and costs
 
 **printful_list_countries**
 - Supported countries and states
+- Takes no arguments at all — it is the one tool with no parameters, not even `format`
 - Use: Validate addresses
 - Returns: Country codes, state codes
+
+**printful_calculate_tax**
+- Get the tax rate for a destination
+- Required: `country_code`
+- Optional: `state_code`, `city`, `zip_code`
+- Uses API v1; v2 has no tax endpoint
+- Use: Showing a customer their all-in total
 
 ### 🖼️ Mockup Tools
 
 **printful_create_mockup_task**
 - Generate product mockup images
-- Required: Product ID, variant IDs, design URL
-- Optional: Placement, technique, format
+- Required: `product_id`, `variant_ids` (comma-separated), `design_url`
+- Optional: `mockup_style_ids` (comma-separated, from `printful_list_mockup_styles`), `placement`, `technique`, `format`
+- ⚠️ Here `format` is the **image** format (`"jpg"` / `"png"`), not the response format
 - Returns: Task ID (not the mockups yet!)
 
 **printful_get_mockup_task**
 - Check generation status
+- Required: `task_id`
 - Returns: Status + mockup URLs when ready
 - Use: 15-30 seconds after creating task
+
+**printful_list_mockup_styles**
+- Mockup styles available for a catalog product
+- Required: `product_id`
+- Use: The style IDs it returns feed `printful_create_mockup_task`
+
+**printful_list_mockup_templates**
+- Print-area templates (positional data) for a catalog product
+- Required: `product_id`
+- Use: Placing artwork precisely within a print area
 
 ### 📁 File Tools
 
 **printful_add_file**
-- Upload design file to library
-- Accepts: URL or base64 data
+- Add a design file to the library by URL
+- Required: `url`
+- Optional: `filename`, `visible`
 - Returns: File ID for later use
 
 **printful_get_file**
 - Get file information
+- Required: `file_id`
 - Returns: URL, status, dimensions
 - Use: Check upload status
+
+⚠️ There is no list-files tool, because Printful has no list-files endpoint in either API
+version. Keep track of the IDs `printful_add_file` returns.
 
 ### 🏪 Store Tools
 
@@ -279,10 +384,16 @@ Rate limit: 120 requests per 60 seconds
 
 **printful_get_store_stats**
 - Sales and profit metrics
-- **Requires: store_id** (get it from `printful_list_stores` first)
-- Optional: Date range, currency
+- Required: `store_id` (get it from `printful_list_stores` first), **`date_from` and `date_to`** — the date range is not optional, and the range cannot exceed 6 months
+- Optional: `report_types`, `currency`
 - Returns: Revenue, costs, profit
-- ⚠️ **This is the ONLY tool that requires store_id as a parameter**
+- ⚠️ **This is the ONLY tool that takes store_id as a parameter**
+
+**printful_list_store_templates**
+- The store's saved product templates
+- Optional: `limit` (default 20), `offset`
+- Uses API v1; v2 has no product-templates endpoint
+- Use: "What templates have I saved?"
 
 ### 🔄 Sync Product Tools (v1 API)
 
@@ -304,8 +415,13 @@ Rate limit: 120 requests per 60 seconds
 - Ensure `PRINTFUL_API_KEY` is set in `env` section
 
 ### "Rate limit exceeded"
-**Solution:** Wait 60 seconds, then retry
-- Default limit: 120 requests/minute
+**Solution:** Stop and report the wait time — do not retry in a loop
+- The error message carries Printful's own `Retry-After` value; wait at least that long
+- The server raises on the first 429 and does **not** retry for you. That is deliberate: an
+  automatic retry is what turns a mockup rate limit into a 60-second lockout
+- General limit: 120 requests per 60 seconds
+- Mockup creation: 10 per 60s established / **2 per 60s for new stores**, plus a cap of 20,000
+  generated files per account per 24 hours
 - Implement pauses between bulk operations
 
 ### "Resource not found"
@@ -343,7 +459,7 @@ mcporter call printful_mcp.printful_get_product product_id:71
 3. **Use HTTP transport** (bypasses mcporter's stdio bridge):
 ```bash
 # Start server with HTTP transport
-python -m printful_mcp --transport http --port 8000
+.venv/bin/python -m printful_mcp --transport http --port 8000
 
 # Server runs on http://localhost:8000/mcp (StreamableHTTP)
 # Connect HTTP-compatible MCP clients directly
@@ -435,9 +551,15 @@ For each product in user's list:
 ## API Version Notes
 
 - **Primary:** API v2 (beta, but production-ready)
-- **Fallback:** API v1 for sync products
+- **Fallback:** API v1, used only where v2 has no equivalent — sync products
+  (`printful_list_sync_products`, `printful_get_sync_product`), product templates
+  (`printful_list_store_templates`) and tax rates (`printful_calculate_tax`)
 - **Auto-switching:** Server handles version selection
 - **Future-proof:** v2 will become standard
+
+Errors read the same either way. Despite what the v2 documentation says about RFC 9457 problem
+details, the live API returns the v1-style envelope for 4xx responses, and the server normalizes
+both into one readable message.
 
 ## Quick Tips
 
@@ -455,7 +577,6 @@ For detailed documentation:
 - [README.md](../../../README.md) - Full setup and usage guide
 - [QUICKSTART.md](../../../QUICKSTART.md) - 3-minute setup
 - [API_TOKEN_SETUP.md](../../../API_TOKEN_SETUP.md) - API key configuration
-- [TESTING.md](../../../TESTING.md) - Testing strategies
 
 For support:
 - GitHub Issues: Report bugs or request features

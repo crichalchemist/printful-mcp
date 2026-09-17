@@ -37,16 +37,23 @@ Scopes control what the API token can do. Here's what you need:
 
 ### ✅ Orders: "View and manage all orders"
 **Why needed:**
-- Create draft orders
-- View order status
+- Create, update and cancel draft orders
+- View order status, items and shipments
 - Confirm orders for fulfillment
 - List all orders
+- Run cost-estimation tasks
 
-**Tools that need this:**
+**Tools that need this** — every tool calling `/orders…` or `/order-estimation-tasks`:
 - `printful_create_order`
 - `printful_get_order`
+- `printful_update_order`
+- `printful_cancel_order`
 - `printful_confirm_order`
 - `printful_list_orders`
+- `printful_list_order_items`
+- `printful_list_order_shipments`
+- `printful_create_estimation_task`
+- `printful_get_estimation_task`
 
 ### ✅ Store Information: "View all store information"
 **Why needed:**
@@ -64,10 +71,11 @@ Scopes control what the API token can do. Here's what you need:
 - Retrieve file information
 - Generate mockups with custom designs
 
-**Tools that need this:**
+**Tools that need this** — every tool calling `/files…` or `/mockup-tasks`:
 - `printful_add_file`
 - `printful_get_file`
 - `printful_create_mockup_task`
+- `printful_get_mockup_task`
 
 ---
 
@@ -99,23 +107,37 @@ Scopes control what the API token can do. Here's what you need:
 ### ⚪ Product Templates: "View product templates"
 **Why needed:**
 - Legacy v1 API feature
-- Not commonly used
-- Product templates are being deprecated
+- Used by exactly one tool, `printful_list_store_templates`, which calls
+  `GET /product-templates`
 
-**Recommendation:** Skip unless you specifically need this
+**Recommendation:** Skip unless you use that tool. Note that this repository does not
+verify which Printful scope governs `/product-templates` — that needs a live call with
+the scope withheld, which nothing here performs.
+
+---
+
+## The Tools No Scope Above Governs
+
+The catalog, geography, shipping-rate and tax tools do not read store-owned data, so none
+of the scopes above is written for them. They are not listed here one by one on purpose:
+**`API_SCOPES_REFERENCE.md` carries the complete tool→endpoint map for all 32 registered
+tools**, derived from the `@mcp.tool` registrations in `src/printful_mcp/server.py` and
+the request builders in `src/printful_core/endpoints/`. Keep that map current when a tool
+is added; this document describes what each scope buys, not the full roster.
 
 ---
 
 ## Scope Combinations by Use Case
 
 ### Use Case 1: Full Functionality (Recommended)
-**Perfect for:** Complete access to all features
+**Perfect for:** Everything except product templates — 31 of the 32 tools
 
 ```
 ✅ View and manage all orders
 ✅ View all store information  
 ✅ View and manage all store files
 ✅ View all store products
+⚪ View product templates (only for `printful_list_store_templates`)
 ```
 
 ### Use Case 2: Read-Only Testing
@@ -204,14 +226,16 @@ PRINTFUL_API_KEY=your-actual-token-here
 
 ### Method 2: Direct in MCP Config
 
+Use an **absolute path** to the interpreter you installed into. A bare `python` resolves against
+`PATH` and picks whichever interpreter the client happens to find first, which is usually not the
+one holding this package.
+
 For Cursor (`~/.cursor/mcp.json`):
 ```json
 {
   "mcpServers": {
     "printful": {
-      "command": "python",
-      "args": ["-m", "printful_mcp"],
-      "cwd": "/path/to/printful-ph-mcp",
+      "command": "/absolute/path/to/printful-mcp/.venv/bin/printful-mcp",
       "env": {
         "PRINTFUL_API_KEY": "your-actual-token-here"
       }
@@ -225,9 +249,7 @@ For Claude Desktop (`~/Library/Application Support/Claude/claude_desktop_config.
 {
   "mcpServers": {
     "printful": {
-      "command": "python",
-      "args": ["-m", "printful_mcp"],
-      "cwd": "/path/to/printful-ph-mcp",
+      "command": "/absolute/path/to/printful-mcp/.venv/bin/printful-mcp",
       "env": {
         "PRINTFUL_API_KEY": "your-actual-token-here"
       }
@@ -241,10 +263,12 @@ For Claude Desktop (`~/Library/Application Support/Claude/claude_desktop_config.
 For testing only:
 ```bash
 export PRINTFUL_API_KEY=your-actual-token-here
-python test_server.py
+export PRINTFUL_STORE_ID=your-store-id
+.venv/bin/python -m pytest -m live -k "TestLiveReadOnly"
 ```
 
-**Note:** This only lasts for your current terminal session.
+**Note:** This only lasts for your current terminal session. See "Testing Your Token" below for
+what this command actually runs and what a full live run would do differently.
 
 ---
 
@@ -289,19 +313,25 @@ After setting up your token, test it:
 # Set your token
 export PRINTFUL_API_KEY=your-token-here
 
-# Run the test suite
-python test_server.py
+# Run the read-only live checks (an account-level token also needs
+# PRINTFUL_STORE_ID exported, or store-scoped calls are rejected)
+.venv/bin/python -m pytest -m live -k "TestLiveReadOnly"
 ```
 
-Expected output:
-```
-✓ PASS - Connection & Auth
-✓ PASS - List Countries
-✓ PASS - List Products
-...
-```
+`TestLiveReadOnly` (in `src/printful_cli/tests/test_full_e2e.py`) is the one live class that
+touches nothing but `GET` requests — it lists countries, products, variants, categories,
+stores and orders, and checks that a bad product ID errors cleanly. Every assertion in it
+tolerates an empty, brand-new store, so if your token and scopes are configured correctly, it
+reports all 11 tests passing.
 
-If all tests pass, your token is configured correctly! 🎉
+**This is deliberately not the full `-m live` run.** `.venv/bin/python -m pytest -m live` (no
+`-k`) also collects everything in `TestLiveDraftOrder` — its own source labels the class
+"Live writes"; it creates and cancels a real draft order and starts real (free) estimation
+tasks — plus `test_live_mcp.py::test_an_estimate_can_be_started_and_read`, which also starts an
+estimation task, and, only when you additionally set `PRINTFUL_E2E_MOCKUPS=1`, mockup and
+file-upload tests. Nothing here charges your account (draft orders aren't confirmed, estimates
+place no order), but they are real writes, not a read-only check. Run the full suite only if you
+want that coverage and understand what it does.
 
 ---
 
@@ -316,6 +346,7 @@ Scopes:
 ✅ View all store information
 ✅ View and manage all store files
 ✅ View all store products
+⚪ View product templates (only for printful_list_store_templates)
 
 Security:
 🔒 Store in .env file (never commit)
@@ -329,7 +360,7 @@ Security:
 - [ ] Enabled all recommended scopes
 - [ ] Added token to `.env` file
 - [ ] Verified `.env` is in `.gitignore`
-- [ ] Tested with `python test_server.py`
+- [ ] Tested with `.venv/bin/python -m pytest -m live -k "TestLiveReadOnly"`
 - [ ] Configured Cursor/Claude Desktop MCP
 
 ---

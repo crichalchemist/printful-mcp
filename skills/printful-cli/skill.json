@@ -1,0 +1,5 @@
+{
+  "name": "printful-cli",
+  "version": "0.1.0",
+  "description": "Use the `printful` CLI: catalog, orders, shipping, tax, mockups, files and store config from a terminal."
+}

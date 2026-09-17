@@ -100,5 +100,9 @@ where = ["src"]
 "printful_cli" = ["skills/*.md"]
 
 [project.scripts]
-printful-mcp = "printful_mcp.server:main"
+# `printful_mcp.__main__:main`, not `server:main`. The installed executable is
+# the only entry point a `uv tool install` or `uvx` user ever gets -- there is no
+# `python -m` there -- and `server:main` ignored sys.argv entirely, so
+# `--transport http` was unreachable for them and `--help` printed nothing.
+printful-mcp = "printful_mcp.__main__:main"
 printful = "printful_cli.printful_cli:main"

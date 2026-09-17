@@ -155,6 +155,41 @@ env_vars = ["PRINTFUL_API_KEY", "PRINTFUL_STORE_ID"]
 the `.codex-plugin/` manifest and why the compatibility layout was chosen, is in
 [.codex-plugin/INSTALL.md](.codex-plugin/INSTALL.md).
 
+### Option 5 — `uv tool install`, for a command on your `PATH`
+
+Option 2's `uvx` resolves the package on every start. This installs it once, into an isolated
+environment uv manages:
+
+```bash
+uv tool install git+https://github.com/Purple-Horizons/printful-mcp@main
+```
+
+Both executables land on your `PATH`: `printful-mcp` and `printful`, taking the same flags they
+take from a clone — `printful-mcp --transport http --port 8000` works. `uv tool upgrade
+printful-mcp` re-resolves `@main`; `uv tool uninstall printful-mcp` removes both.
+
+**Two things differ from a clone, and neither announces itself:**
+
+- **The installed server never reads your project's `.env`.** `load_dotenv()` walks up from the
+  *module's own directory*, which here is inside uv's tool environment. An editable install
+  finds the repository's `.env` because the module sits in the repository; this one cannot, no
+  matter which directory you launch it from. Put the token in the environment or in the
+  client's `env` block.
+- **Spell the executable out in an MCP client.** A GUI client does not inherit your login
+  shell's `PATH`, so `"command": "printful-mcp"` can fail to resolve where the same word works
+  in your terminal. `uv tool dir --bin` prints the directory to name.
+
+```json
+{
+  "mcpServers": {
+    "printful": {
+      "command": "/Users/you/.local/bin/printful-mcp",
+      "env": { "PRINTFUL_API_KEY": "${PRINTFUL_API_KEY}" }
+    }
+  }
+}
+```
+
 ---
 
 ## Configuration
@@ -554,7 +589,7 @@ mv .env .env.aside && .venv/bin/python -m pytest -q; mv .env.aside .env
 Note the `;` before the restore, so `.env` comes back even when the suite fails.
 
 **Do not pass a directory path to run "the suite."** A path argument overrides `testpaths`, so
-`pytest src/printful_mcp/tests` collects 142 of the suite's 434 cases, reports them all passing,
+`pytest src/printful_mcp/tests` collects 145 of the suite's 437 cases, reports them all passing,
 and runs nothing from the core or the CLI. A path to a single file is fine when you mean it.
 
 Live tests are excluded from the default selection by `addopts = "-m 'not live'"` so a fresh
